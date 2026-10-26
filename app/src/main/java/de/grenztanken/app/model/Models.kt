@@ -89,6 +89,45 @@ data class DePrice(
     }
 }
 
+/** Eine Tankstelle im Umkreis der deutschen Tankstelle (aus der Tankerkönig-Umkreissuche). */
+data class AreaStation(
+    val id: String,
+    val name: String,
+    val distKm: Double?,
+    val e5: Double?,
+    val e10: Double?,
+    val diesel: Double?,
+    val isOpen: Boolean,
+) {
+    fun priceFor(fuel: Fuel): Double? = when (fuel) {
+        Fuel.E5 -> e5
+        Fuel.E10 -> e10
+        Fuel.DIESEL -> diesel
+    }
+}
+
+/** Preise aller Tankstellen im Umkreis [radiusKm] um die deutsche Tankstelle (ohne sie selbst). */
+data class Area(
+    val stationId: String,
+    val radiusKm: Double,
+    val fetchedAt: Long,
+    val stations: List<AreaStation>,
+)
+
+/** Ein abgerufener Preis der deutschen Tankstelle (lokal mitgeschrieben). */
+data class PriceObservation(
+    val at: Long,
+    val e5: Double?,
+    val e10: Double?,
+    val diesel: Double?,
+) {
+    fun priceFor(fuel: Fuel): Double? = when (fuel) {
+        Fuel.E5 -> e5
+        Fuel.E10 -> e10
+        Fuel.DIESEL -> diesel
+    }
+}
+
 /** Amtlicher Höchstpreis in Landeswährung pro Liter, gültig von [from] bis [to] (jeweils ganztägig). */
 data class CapPeriod(
     val from: LocalDate,
@@ -110,6 +149,10 @@ data class EuWeekly(val e95: Double, val diesel: Double, val week: LocalDate) {
 
 data class Market(
     val de: DePrice? = null,
+    val area: Area? = null,
+    /** Mitgeschriebene Preise der deutschen Tankstelle [historyStationId], älteste zuerst. */
+    val history: List<PriceObservation> = emptyList(),
+    val historyStationId: String = "",
     val czCaps: List<CapPeriod> = emptyList(),
     val plCaps: List<CapPeriod> = emptyList(),
     val czk: RateInfo? = null,

@@ -71,7 +71,7 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Section("Tankerkönig-Schlüssel") {
                 OutlinedTextField(
@@ -200,8 +200,8 @@ fun SettingsScreen(
 
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        content()
+    AppCard {
+        SectionLabel(title, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }

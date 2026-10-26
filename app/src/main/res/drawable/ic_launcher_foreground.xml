@@ -8,9 +8,9 @@
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M39,34h20a3,3 0 0 1 3,3v38h-26v-38a3,3 0 0 1 3,-3z" />
-    <!-- Anzeige -->
+    <!-- Anzeige (Bernstein wie in der App) -->
     <path
-        android:fillColor="#1F6F4A"
+        android:fillColor="#E59B1E"
         android:pathData="M42,39h14v9h-14z" />
     <!-- Sockel -->
     <path

@@ -104,7 +104,7 @@ fun ForeignDialog(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedButton(onClick = { searching = true }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { searching = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.Search, contentDescription = null)
                     Text("  In OpenStreetMap suchen")
                 }

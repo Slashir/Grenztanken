@@ -7,7 +7,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import de.grenztanken.app.model.Area
+import de.grenztanken.app.model.AreaStation
 import de.grenztanken.app.model.CapPeriod
+import de.grenztanken.app.model.PriceObservation
 import de.grenztanken.app.model.Country
 import de.grenztanken.app.model.DePrice
 import de.grenztanken.app.model.EuWeekly
@@ -137,6 +140,41 @@ object JsonCodec {
                     .put("pricedAt", it.pricedAt),
             )
         }
+        m.area?.let { a ->
+            put(
+                "area",
+                JSONObject()
+                    .put("stationId", a.stationId)
+                    .put("radiusKm", a.radiusKm)
+                    .put("fetchedAt", a.fetchedAt)
+                    .put(
+                        "stations",
+                        JSONArray().apply {
+                            a.stations.forEach { st ->
+                                put(
+                                    JSONObject()
+                                        .put("id", st.id)
+                                        .put("name", st.name)
+                                        .putOpt("dist", st.distKm)
+                                        .putOpt("e5", st.e5)
+                                        .putOpt("e10", st.e10)
+                                        .putOpt("diesel", st.diesel)
+                                        .put("open", st.isOpen),
+                                )
+                            }
+                        },
+                    ),
+            )
+        }
+        put("historyStationId", m.historyStationId)
+        put(
+            "history",
+            JSONArray().apply {
+                m.history.forEach {
+                    put(JSONObject().put("at", it.at).putOpt("e5", it.e5).putOpt("e10", it.e10).putOpt("diesel", it.diesel))
+                }
+            },
+        )
         put("czCaps", capsToJson(m.czCaps))
         put("plCaps", capsToJson(m.plCaps))
         m.czk?.let { put("czk", rateToJson(it)) }
@@ -163,9 +201,40 @@ object JsonCodec {
                     pricedAt = it.optLong("pricedAt", it.optLong("fetchedAt")),
                 )
             },
+            area = o.optJSONObject("area")?.let { a ->
+                val arr = a.optJSONArray("stations") ?: JSONArray()
+                Area(
+                    stationId = a.optString("stationId"),
+                    radiusKm = a.optDouble("radiusKm", 0.0),
+                    fetchedAt = a.optLong("fetchedAt"),
+                    stations = (0 until arr.length()).mapNotNull { i ->
+                        runCatching {
+                            val st = arr.getJSONObject(i)
+                            AreaStation(
+                                id = st.getString("id"),
+                                name = st.optString("name"),
+                                distKm = st.dbl("dist"),
+                                e5 = st.dbl("e5"),
+                                e10 = st.dbl("e10"),
+                                diesel = st.dbl("diesel"),
+                                isOpen = st.optBoolean("open"),
+                            )
+                        }.getOrNull()
+                    },
+                )
+            },
+            historyStationId = o.optString("historyStationId"),
+            history = o.optJSONArray("history")?.let { arr ->
+                (0 until arr.length()).mapNotNull { i ->
+                    runCatching {
+                        val h = arr.getJSONObject(i)
+                        PriceObservation(h.getLong("at"), h.dbl("e5"), h.dbl("e10"), h.dbl("diesel"))
+                    }.getOrNull()
+                }
+            } ?: emptyList(),
             czCaps = capsFromJson(o.optJSONArray("czCaps")),
             plCaps = capsFromJson(o.optJSONArray("plCaps")),
-            czk = o.optJSONObject("czk")?.let { rateFromJson(it) },
+            czk =o.optJSONObject("czk")?.let { rateFromJson(it) },
             pln = o.optJSONObject("pln")?.let { rateFromJson(it) },
             euCz = o.optJSONObject("euCz")?.let { euFromJson(it) },
             euPl = o.optJSONObject("euPl")?.let { euFromJson(it) },

@@ -6,7 +6,14 @@ deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 ## Was die App zeigt
 
 - **Deutschland:** aktueller Preis deiner gewählten Tankstelle (E5, E10 oder Diesel) über die
-  Tankerkönig-API (Daten der Markttransparenzstelle für Kraftstoffe).
+  Tankerkönig-API (Daten der Markttransparenzstelle für Kraftstoffe). Ist sie geschlossen, bleibt der
+  letzte bekannte Preis mit Zeitstempel stehen.
+- **Einordnung des deutschen Preises:**
+  - *Umgebung jetzt:* Durchschnitt und günstigste der geöffneten Tankstellen im Umkreis von 5 km
+    (dieselbe Tankerkönig-Umkreisabfrage liefert auch den eigenen Preis, also keine Zusatzabfrage).
+  - *Ø heute / Ø 7 Tage:* aus den lokal mitgeschriebenen eigenen Abrufen (14 Tage). Jeder Preis gilt
+    bis zum nächsten Abruf, höchstens 2 Stunden. Tankerkönig erlaubt keine Hintergrundabfragen, daher
+    ist der Wert nur so dicht wie die eigenen Abrufe; die App zeigt die Zahl der Abrufe an.
 - **Tschechien / Polen:** Tankstellen per OpenStreetMap-Suche (rund um die deutsche Tankstelle oder
   um einen Ort) oder frei angelegt. Bei Tankstellen aus der Suche berechnet die App die Autostrecke
   ab der deutschen Tankstelle selbst und bietet „Route in Google Maps“ an. Welcher Preis genutzt wird:
@@ -138,7 +145,9 @@ app/src/main/java/de/grenztanken/app/
   data/Osm.kt            Tankstellensuche CZ/PL (Nominatim), Strecke (OSRM) (Parser getestet)
   logic/Calc.kt          Rechnung (getestet)
   logic/PriceResolver.kt Preisquelle wählen, Morgen-Hinweis (getestet)
+  logic/Stats.kt         Umgebung, mitgeschriebener Verlauf, zeitgewichteter Ø (getestet)
   Config.kt              optionale Relay-Adresse für EU-Werte
-  ui/                    Compose-Oberfläche
+  ui/                    Compose-Oberfläche (Theme.kt: eigenes Farbschema hell/dunkel,
+                         Components.kt: gemeinsame Bausteine wie Zapfsäulen-Preis)
 app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser und OSM-Suche
 ```

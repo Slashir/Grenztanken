@@ -12,13 +12,16 @@ object Fmt {
     private val L: Locale = Locale.GERMANY
 
     fun dec(v: Double, digits: Int): String = String.format(L, "%.${digits}f", v)
-    fun eur(v: Double): String = String.format(L, "%.2f €", v)
+    fun eur(v: Double): String = minus(String.format(L, "%.2f €", v))
     fun eurSigned(v: Double): String = (if (v > 0) "+" else "") + eur(v)
     fun eurPerL(v: Double): String = String.format(L, "%.3f €/l", v)
-    fun ctPerL(v: Double): String = String.format(L, "%+.1f ct/l", v * 100.0)
+    fun ctPerL(v: Double): String = minus(String.format(L, "%+.1f ct/l", v * 100.0))
     fun km(v: Double): String = String.format(L, "%.0f km", v)
     fun local(v: Double, c: Country): String = String.format(L, "%.2f %s/l", v, c.currencySymbol)
-    fun localDiff(v: Double, c: Country): String = String.format(L, "%+.2f %s/l", v, c.currencySymbol)
+    fun localDiff(v: Double, c: Country): String = minus(String.format(L, "%+.2f %s/l", v, c.currencySymbol))
+
+    /** Typografisches Minus statt Bindestrich, damit Beträge sauber untereinander stehen. */
+    private fun minus(s: String): String = s.replace('-', '−')
     fun date(d: LocalDate): String = d.format(DAY_YEAR)
 
     /** "am 27.10." oder "24.10.–26.10." */

@@ -10,7 +10,11 @@ import de.grenztanken.app.data.Sources
 import de.grenztanken.app.data.Tankerkoenig
 import de.grenztanken.app.data.errorText
 import de.grenztanken.app.logic.PriceResolver
+import de.grenztanken.app.logic.Stats
+import de.grenztanken.app.model.Area
+import de.grenztanken.app.model.AreaStation
 import de.grenztanken.app.model.Country
+import de.grenztanken.app.model.PriceObservation
 import de.grenztanken.app.model.DePrice
 import de.grenztanken.app.model.ForeignStation
 import de.grenztanken.app.model.GermanStation
@@ -49,8 +53,9 @@ data class OsmSearchState(
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repo(app)
 
-    val settings: StateFlow<Settings> =
-        repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    /** null, bis die gespeicherten Einstellungen geladen sind (verhindert kurzes Aufblitzen von "Einrichten"). */
+    val settings: StateFlow<Settings?> =
+        repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _market = MutableStateFlow(Market())
     val market: StateFlow<Market> = _market.asStateFlow()
@@ -102,9 +107,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val minAge = if (force) 60_000L else 5 * 60_000L
                 if (m.de?.stationId != station.id || age > minAge) {
                     try {
-                        val p = Tankerkoenig.prices(s.apiKey, listOf(station.id))[station.id]
-                        val fresh = DePrice(station.id, p?.e5, p?.e10, p?.diesel, p?.status ?: "no prices", now)
-                        m = m.copy(de = DePrice.merge(m.de, fresh))
+                        // Eine Umkreisabfrage liefert den eigenen Preis und die Umgebung zugleich.
+                        val coords = germanCoords()
+                        val list = coords?.let { (lat, lng) -> Tankerkoenig.list(s.apiKey, lat, lng, AREA_RADIUS_KM) }
+                        val own = list?.firstOrNull { it.id == station.id }
+                        val fresh = if (own != null) {
+                            DePrice(station.id, own.e5, own.e10, own.diesel, if (own.isOpen) "open" else "closed", now)
+                        } else {
+                            val p = Tankerkoenig.prices(s.apiKey, listOf(station.id))[station.id]
+                            DePrice(station.id, p?.e5, p?.e10, p?.diesel, p?.status ?: "no prices", now)
+                        }
+                        val history = if (m.historyStationId == station.id) m.history else emptyList()
+                        m = m.copy(
+                            de = DePrice.merge(m.de, fresh),
+                            area = list?.let { all ->
+                                Area(
+                                    stationId = station.id,
+                                    radiusKm = AREA_RADIUS_KM,
+                                    fetchedAt = now,
+                                    stations = all.filter { it.id != station.id }.map {
+                                        AreaStation(it.id, it.name, it.dist, it.e5, it.e10, it.diesel, it.isOpen)
+                                    },
+                                )
+                            } ?: m.area?.takeIf { it.stationId == station.id },
+                            history = Stats.record(history, PriceObservation(now, fresh.e5, fresh.e10, fresh.diesel)),
+                            historyStationId = station.id,
+                        )
                     } catch (e: Exception) {
                         errors += "Deutschland: ${errorText(e)}"
                     }
@@ -342,5 +370,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private val BERLIN: ZoneId = ZoneId.of("Europe/Berlin")
         private const val SEARCH_RADIUS_KM = 10.0
+        private const val AREA_RADIUS_KM = 5.0
     }
 }

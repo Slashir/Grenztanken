@@ -1,9 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package de.grenztanken.app.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,20 +26,21 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,20 +48,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.grenztanken.app.OsmSearchState
 import de.grenztanken.app.logic.Calc
+import de.grenztanken.app.logic.Calculation
 import de.grenztanken.app.logic.ForeignPrice
 import de.grenztanken.app.logic.PriceResolver
 import de.grenztanken.app.logic.PriceSource
+import de.grenztanken.app.logic.Stats
 import de.grenztanken.app.logic.TomorrowHint
-import de.grenztanken.app.logic.Calculation
 import de.grenztanken.app.model.DePrice
 import de.grenztanken.app.model.ForeignStation
-import de.grenztanken.app.model.Fuel
 import de.grenztanken.app.model.GermanStation
 import de.grenztanken.app.model.Market
 import de.grenztanken.app.model.RateInfo
@@ -81,10 +88,12 @@ fun HomeScreen(
 ) {
     var editing by remember { mutableStateOf<ForeignStation?>(null) }
     var creating by remember { mutableStateOf(false) }
+    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text("Grenztanken") },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !market.loading) {
@@ -94,12 +103,15 @@ fun HomeScreen(
                         Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
                     }
                 },
+                scrollBehavior = scroll,
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 text = { Text("Tankstelle") },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 onClick = { creating = true },
             )
         },
@@ -108,7 +120,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (market.loading) {
@@ -121,25 +133,13 @@ fun HomeScreen(
                 item { SetupCard(onOpenSettings) }
             }
             settings.german?.let { german ->
-                item {
-                    GermanCard(german, settings.fuel, market.de?.takeIf { it.stationId == german.id })
-                }
+                item { GermanCard(german, settings, market) }
             }
-            item {
-                Text(
-                    "${settings.fuel.label} · ${Fmt.dec(settings.consumption, 1)} l/100 km · " +
-                        "${Fmt.dec(settings.liters, 0)} l tanken" +
-                        if (settings.wearCentPerKm > 0.0) {
-                            " · Verschleiß ${Fmt.dec(settings.wearCentPerKm, 1)} ct/km"
-                        } else {
-                            " · ohne Verschleiß"
-                        },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            item { SettingsChips(settings, onOpenSettings) }
             if (settings.foreign.isEmpty()) {
                 item { HintCard() }
+            } else {
+                item { SectionLabel("Im Ausland tanken", Modifier.padding(start = 4.dp, top = 8.dp)) }
             }
             items(settings.foreign, key = { it.id }) { station ->
                 ForeignCard(station, settings, market, onClick = { editing = station })
@@ -172,43 +172,105 @@ fun HomeScreen(
     }
 }
 
+// ---------------------------------------------------------------- Deutsche Tankstelle
+
 @Composable
-private fun GermanCard(station: GermanStation, fuel: Fuel, de: DePrice?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
+private fun GermanCard(station: GermanStation, s: Settings, m: Market) {
+    val de: DePrice? = m.de?.takeIf { it.stationId == station.id }
+    val price = de?.priceFor(s.fuel)
+    val r = LocalResultColors.current
+
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("🇩🇪  Deine Tankstelle", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            de?.let {
+                val open = it.status == "open"
+                Tag(
+                    Fmt.status(it.status),
+                    if (open) r.goodContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                    if (open) r.onGoodContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(station.name, style = MaterialTheme.typography.titleMedium)
+        Text(station.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            if (price != null) {
+                PumpPrice(price, MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold))
+            } else {
+                Text("–", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.weight(1f))
             Text(
-                "🇩🇪 Deine Tankstelle",
+                s.fuel.label,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
             )
-            Text(station.name, style = MaterialTheme.typography.titleMedium)
+        }
+        de?.let {
             Text(
-                station.address,
+                if (it.isStale) "Letzter Preis vom ${Fmt.time(it.pricedAt)} · abgerufen ${Fmt.time(it.fetchedAt)}"
+                else "Stand ${Fmt.time(it.fetchedAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(8.dp))
-            val price = de?.priceFor(fuel)
-            Text(
-                price?.let { Fmt.eurPerL(it) } ?: "–",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
+        }
+        if (price != null) {
+            ComparisonBlock(price, station, s, m)
+        }
+    }
+}
+
+@Composable
+private fun ComparisonBlock(price: Double, station: GermanStation, s: Settings, m: Market) {
+    val area = m.area?.takeIf { it.stationId == station.id }?.let { Stats.area(it, s.fuel) }
+    val history = if (m.historyStationId == station.id) m.history else emptyList()
+    val now = System.currentTimeMillis()
+    val dayStart = LocalDate.now(BERLIN).atStartOfDay(BERLIN).toInstant().toEpochMilli()
+    val today = Stats.timeWeighted(history, s.fuel, dayStart, now + 1)
+    val week = Stats.timeWeighted(history, s.fuel, now - 7L * 24 * 3_600_000L, now + 1)
+    if (area == null && today == null && week == null) return
+
+    HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        area?.let {
+            CompareRow(
+                title = "Umgebung jetzt",
+                detail = "Ø von ${it.count} geöffneten im Umkreis ${Fmt.km(it.radiusKm)}",
+                average = it.average,
+                own = price,
             )
             Text(
-                buildString {
-                    append(fuel.label)
-                    if (de != null) {
-                        append(" · ")
-                        append(Fmt.status(de.status))
-                        if (de.isStale) {
-                            append(" · letzter Preis vom ")
-                            append(Fmt.time(de.pricedAt))
-                        } else {
-                            append(" · Stand ")
-                            append(Fmt.time(de.fetchedAt))
-                        }
-                    }
-                },
+                "Günstigste: ${it.cheapest.name} ${Fmt.eurPerL(it.cheapestPrice)}" +
+                    (it.cheapest.distKm?.let { d -> " · ${Fmt.dec(d, 1)} km" } ?: ""),
+                style = MaterialTheme.typography.bodySmall.merge(Tabular),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        today?.let {
+            CompareRow(
+                title = "Ø heute",
+                detail = "aus ${it.observations} ${if (it.observations == 1) "Abruf" else "Abrufen"} · " +
+                    "${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
+                average = it.average,
+                own = price,
+            )
+        }
+        week?.let {
+            if (it.observations > (today?.observations ?: 0)) {
+                CompareRow(
+                    title = "Ø 7 Tage",
+                    detail = "aus ${it.observations} Abrufen · ${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
+                    average = it.average,
+                    own = price,
+                )
+            }
+        }
+        if (today != null || week != null) {
+            Text(
+                "Ø heute / 7 Tage stammen aus deinen eigenen Abrufen und sind umso genauer, je öfter du die App öffnest.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -217,81 +279,113 @@ private fun GermanCard(station: GermanStation, fuel: Fuel, de: DePrice?) {
 }
 
 @Composable
+private fun CompareRow(title: String, detail: String, average: Double, own: Double) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(8.dp))
+                Text(Fmt.eurPerL(average), style = MaterialTheme.typography.bodyMedium.merge(Tabular))
+            }
+            Text(detail, style = MaterialTheme.typography.bodySmall.merge(Tabular), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DeltaTag(own, average)
+    }
+}
+
+@Composable
+private fun SettingsChips(s: Settings, onOpenSettings: () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(horizontal = 4.dp),
+    ) {
+        val c = MaterialTheme.colorScheme.secondaryContainer
+        val on = MaterialTheme.colorScheme.onSecondaryContainer
+        listOf(
+            s.fuel.label,
+            "${Fmt.dec(s.consumption, 1)} l/100 km",
+            "${Fmt.dec(s.liters, 0)} l tanken",
+            if (s.wearCentPerKm > 0.0) "Verschleiß ${Fmt.dec(s.wearCentPerKm, 1)} ct/km" else "ohne Verschleiß",
+        ).forEach { Tag(it, c, on) }
+        // Ohne onClick-Parameter, sonst erzwingt Material 48 dp Mindesthöhe und die Zeile verrutscht.
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .clickable(onClick = onOpenSettings),
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Text(
+                "Ändern",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Ausland
+
+@Composable
 private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick: () -> Unit) {
     val today = LocalDate.now(BERLIN)
     val price = PriceResolver.resolve(station, s.fuel, m, today)
-    val tomorrow = if (price?.source == PriceSource.CAP_TODAY) {
-        PriceResolver.tomorrow(station, s.fuel, m, today)
-    } else {
-        null
-    }
+    val tomorrow = if (price?.source == PriceSource.CAP_TODAY) PriceResolver.tomorrow(station, s.fuel, m, today) else null
     val dePrice = m.de?.takeIf { it.stationId == s.german?.id }
     val de = dePrice?.priceFor(s.fuel)
 
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${station.country.flag} ${station.name}",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Filled.Edit,
-                    contentDescription = "Bearbeiten",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (station.address.isNotBlank()) {
-                Text(
-                    station.address,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                "${Fmt.km(station.oneWayKm)} einfache Strecke · ${station.country.label}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    AppCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${station.country.flag}  ${station.name}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Icon(Icons.Filled.Edit, contentDescription = "Bearbeiten", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            listOf(station.address, "${Fmt.km(station.oneWayKm)} einfach", station.country.label)
+                .filter { it.isNotBlank() }.joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        when {
+            price == null -> Notice(
+                "Noch kein Preis für ${station.country.label}: kein gültiger Höchstpreis und noch kein " +
+                    "EU-Durchschnitt geladen. Bitte oben aktualisieren oder die Karte antippen und den " +
+                    "Preis an der Säule eintragen.",
             )
-            when {
-                price == null -> Notice(
-                    "Noch kein Preis für ${station.country.label}: kein gültiger Höchstpreis und noch kein " +
-                        "EU-Durchschnitt geladen. Bitte oben aktualisieren oder die Karte antippen und den " +
-                        "Preis an der Säule eintragen.",
-                )
 
-                price.perEur == null -> Notice("Wechselkurs fehlt noch. Bitte oben aktualisieren.")
+            price.perEur == null -> Notice("Wechselkurs fehlt noch. Bitte oben aktualisieren.")
 
-                de == null && dePrice?.status == "closed" -> Notice(
-                    "Deine deutsche Tankstelle hat gerade geschlossen, und Tankerkönig liefert dann keinen " +
-                        "Preis. Sobald sie geöffnet hat, oben aktualisieren – danach bleibt der letzte Preis " +
-                        "auch nachts stehen.",
-                )
+            de == null && dePrice?.status == "closed" -> Notice(
+                "Deine deutsche Tankstelle hat gerade geschlossen, und Tankerkönig liefert dann keinen " +
+                    "Preis. Sobald sie geöffnet hat, oben aktualisieren – danach bleibt der letzte Preis " +
+                    "auch nachts stehen.",
+            )
 
-                de == null -> Notice(
-                    "Deutscher Preis fehlt. Prüfe in den Einstellungen Schlüssel und Tankstelle.",
-                )
+            de == null -> Notice("Deutscher Preis fehlt. Prüfe in den Einstellungen Schlüssel und Tankstelle.")
 
-                else -> ResultBlock(
-                    calc = Calc.compute(
-                        de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm,
-                        wearEurPerKm = s.wearCentPerKm / 100.0,
-                    ),
-                    price = price,
-                    station = station,
-                    s = s,
-                    rate = m.rate(station.country),
-                    tomorrow = tomorrow,
-                    staleDeSince = dePrice?.takeIf { it.isStale }?.pricedAt,
-                )
-            }
-            if (station.lat != null && station.lng != null) {
-                val uri = LocalUriHandler.current
-                TextButton(onClick = { uri.openUri(mapsRouteUrl(s.german, station.lat, station.lng)) }) {
-                    Icon(Icons.Filled.Place, contentDescription = null)
-                    Text("  Route in Google Maps")
-                }
+            else -> ResultBlock(
+                calc = Calc.compute(
+                    de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm,
+                    wearEurPerKm = s.wearCentPerKm / 100.0,
+                ),
+                price = price,
+                station = station,
+                s = s,
+                rate = m.rate(station.country),
+                tomorrow = tomorrow,
+                staleDeSince = dePrice?.takeIf { it.isStale }?.pricedAt,
+            )
+        }
+        if (station.lat != null && station.lng != null) {
+            val uri = LocalUriHandler.current
+            FilledTonalButton(
+                onClick = { uri.openUri(mapsRouteUrl(s.german, station.lat, station.lng)) },
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
+                Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text("  Route in Google Maps")
             }
         }
     }
@@ -324,29 +418,59 @@ private fun ResultBlock(
     tomorrow: TomorrowHint?,
     staleDeSince: Long?,
 ) {
-    val good = MaterialTheme.colorScheme.primary
-    val bad = MaterialTheme.colorScheme.error
+    val r = LocalResultColors.current
     val isEu = price.source == PriceSource.EU_WEEKLY
 
-    Spacer(Modifier.height(4.dp))
-    Text(
-        if (isEu) {
-            "Ø ${Fmt.eurPerL(price.price)}"
+    // Ergebnis zuerst
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (calc.worthIt) r.goodContainer else r.badContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (calc.worthIt) "Lohnt sich" else "Lohnt sich nicht",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (calc.worthIt) r.onGoodContainer else r.onBadContainer,
+                )
+                Text(
+                    calc.breakEvenOneWayKm?.let { "bis ca. ${Fmt.km(it)} einfache Strecke" }
+                        ?: "Im Ausland gerade nicht günstiger",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (calc.worthIt) r.onGoodContainer else r.onBadContainer,
+                )
+            }
+            Text(
+                Fmt.eurSigned(calc.netSaving),
+                style = MaterialTheme.typography.headlineSmall.merge(Tabular),
+                fontWeight = FontWeight.Bold,
+                color = if (calc.worthIt) r.good else r.bad,
+            )
+        }
+    }
+
+    // Preis im Ausland
+    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
+        PumpPrice(calc.foreignEurPerL, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+        if (!isEu) {
+            Text(
+                "  = ${Fmt.local(price.price, station.country)}",
+                style = MaterialTheme.typography.bodyMedium.merge(Tabular),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
         } else {
-            "${Fmt.local(price.price, station.country)} = ${Fmt.eurPerL(calc.foreignEurPerL)}"
-        },
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
-        sourceLabel(price),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+            Text("  Ø Land", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+        }
+    }
+    Text(sourceLabel(price), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (!isEu && rate != null) {
         Text(
             "Kurs: 1 € = ${Fmt.dec(rate.perEur, 3)} ${station.country.currencySymbol} (${rate.date})",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.merge(Tabular),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -358,74 +482,51 @@ private fun ResultBlock(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-    ValueRow("Preisunterschied", Fmt.ctPerL(calc.diffPerL))
-    ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(calc.grossSaving))
-    ValueRow("Sprit hin und zurück (${Fmt.km(2 * station.oneWayKm)})", "− " + Fmt.eur(calc.tripFuelCost))
+
+    // Rechnung
+    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    ValueRow("Preisunterschied", Fmt.ctPerL(calc.diffPerL), labelColor = muted)
+    ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(calc.grossSaving), labelColor = muted)
+    ValueRow("Sprit hin und zurück (${Fmt.km(2 * station.oneWayKm)})", Fmt.eur(-calc.tripFuelCost), labelColor = muted)
     if (calc.wearPerKm > 0.0) {
         ValueRow(
             "Verschleiß (${Fmt.km(2 * station.oneWayKm)} × ${Fmt.dec(calc.wearPerKm * 100.0, 1)} ct)",
-            "− " + Fmt.eur(calc.tripWearCost),
+            Fmt.eur(-calc.tripWearCost),
+            labelColor = muted,
         )
     }
     ValueRow(
         "Unterm Strich",
         Fmt.eurSigned(calc.netSaving),
         bold = true,
-        color = if (calc.worthIt) good else bad,
+        color = if (calc.worthIt) r.good else r.bad,
     )
-    Spacer(Modifier.height(8.dp))
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (calc.worthIt) good.copy(alpha = 0.12f) else bad.copy(alpha = 0.12f),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(
-                if (calc.worthIt) "Lohnt sich" else "Lohnt sich nicht",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (calc.worthIt) good else bad,
-            )
-            Text(
-                calc.breakEvenOneWayKm?.let {
-                    "Rechnet sich bis ca. ${Fmt.km(it)} einfache Strecke."
-                } ?: "Im Ausland ist es gerade nicht günstiger.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
 }
 
 @Composable
 private fun TomorrowLine(t: TomorrowHint, station: ForeignStation) {
-    val text = when {
-        t.diff < -0.005 -> "Morgen günstiger: ${Fmt.local(t.price, station.country)} " +
-            "(${Fmt.localDiff(t.diff, station.country)}). Wenn es nicht eilt, lohnt sich Warten."
-        t.diff > 0.005 -> "Morgen teurer: ${Fmt.local(t.price, station.country)} " +
-            "(${Fmt.localDiff(t.diff, station.country)}). Besser heute tanken."
-        else -> "Morgen gilt derselbe Höchstpreis."
-    }
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(top = 4.dp),
-    )
-}
-
-@Composable
-private fun ValueRow(label: String, value: String, bold: Boolean = false, color: Color = Color.Unspecified) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-            color = color,
+    val r = LocalResultColors.current
+    val (text, container, content) = when {
+        t.diff < -0.005 -> Triple(
+            "Morgen günstiger: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}) – wenn es nicht eilt, warten.",
+            r.goodContainer, r.onGoodContainer,
+        )
+        t.diff > 0.005 -> Triple(
+            "Morgen teurer: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}) – besser heute tanken.",
+            r.badContainer, r.onBadContainer,
+        )
+        else -> Triple(
+            "Morgen gilt derselbe Höchstpreis.",
+            MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurface,
         )
     }
+    Surface(shape = MaterialTheme.shapes.small, color = container, modifier = Modifier.padding(top = 6.dp)) {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = content, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+    }
 }
+
+// ---------------------------------------------------------------- Sonstiges
 
 @Composable
 private fun Notice(text: String) {
@@ -439,16 +540,13 @@ private fun Notice(text: String) {
 
 @Composable
 private fun ErrorCard(errors: List<String>) {
-    Card(
+    androidx.compose.material3.Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text(
-                "Nicht alles konnte geladen werden",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
+            Text("Nicht alles konnte geladen werden", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onErrorContainer)
             errors.forEach {
                 Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
             }
@@ -458,26 +556,25 @@ private fun ErrorCard(errors: List<String>) {
 
 @Composable
 private fun SetupCard(onOpenSettings: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Einrichten", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Trage deinen kostenlosen Tankerkönig-Schlüssel ein und wähle deine deutsche Tankstelle.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = onOpenSettings) { Text("Zu den Einstellungen") }
-        }
+    AppCard {
+        Text("Einrichten", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Trage deinen kostenlosen Tankerkönig-Schlüssel ein und wähle deine deutsche Tankstelle.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Button(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) { Text("Zu den Einstellungen") }
     }
 }
 
 @Composable
 private fun HintCard() {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    AppCard {
+        Text("Noch keine Tankstelle im Ausland", style = MaterialTheme.typography.titleSmall)
         Text(
-            "Füge über „Tankstelle“ eine Tankstelle in Tschechien oder Polen hinzu, " +
-                "mit der Strecke dorthin.",
+            "Tippe unten auf „Tankstelle“ und suche in OpenStreetMap nach einer Tankstelle in Tschechien " +
+                "oder Polen – die Strecke rechnet die App selbst aus.",
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(16.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -485,7 +582,7 @@ private fun HintCard() {
 @Composable
 private fun SourcesFooter() {
     val uri = LocalUriHandler.current
-    Column(Modifier.padding(top = 8.dp)) {
+    Column(Modifier.padding(start = 4.dp, top = 12.dp, end = 4.dp)) {
         Text(
             "Preise Deutschland: Tankerkönig, Daten der Markttransparenzstelle für Kraftstoffe (MTS-K), " +
                 "Lizenz CC BY 4.0. Höchstpreise: Finanzministerium Tschechien, Energieministerium Polen. " +
@@ -498,12 +595,8 @@ private fun SourcesFooter() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row {
-            TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) {
-                Text("tankerkoenig.de")
-            }
-            TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) {
-                Text("OpenStreetMap")
-            }
+            TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) { Text("tankerkoenig.de") }
+            TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) { Text("OpenStreetMap") }
         }
     }
 }

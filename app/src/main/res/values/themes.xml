@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Grenztanken" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Grenztanken" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Gleiche Hintergrundfarbe wie in Compose, damit beim Start nichts aufblitzt -->
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

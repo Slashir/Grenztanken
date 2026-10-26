@@ -1,6 +1,9 @@
 package de.grenztanken.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.grenztanken.app.AppViewModel
 
@@ -32,6 +36,11 @@ fun GrenztankenApp(vm: AppViewModel = viewModel()) {
     }
 
     GrenztankenTheme {
+        val settings = settings ?: run {
+            // Einstellungen werden noch geladen: nur der Hintergrund, kein leerer Zwischenstand.
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+            return@GrenztankenTheme
+        }
         when (screen) {
             Screen.Home -> HomeScreen(
                 settings = settings,
