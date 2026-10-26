@@ -94,7 +94,9 @@ object Osm {
             }
             val lat = o.optString("lat").toDoubleOrNull() ?: return@mapNotNull null
             val lng = o.optString("lon").toDoubleOrNull() ?: return@mapNotNull null
-            val road = listOf(a.text("road"), a.text("house_number")).filter { it.isNotEmpty() }.joinToString(" ")
+            // Außerorts steht als Straße oft nur die Straßennummer, z. B. "26510" oder "13;35".
+            val roadName = a.text("road").let { if (it.matches(ROAD_NUMBER)) "Straße ${it.replace(";", "/")}" else it }
+            val road = listOf(roadName, a.text("house_number")).filter { it.isNotEmpty() }.joinToString(" ")
             val town = listOf("city", "town", "village", "municipality", "hamlet", "suburb")
                 .map { a.text(it) }.firstOrNull { it.isNotEmpty() }.orEmpty()
             val place = listOf(a.text("postcode"), town).filter { it.isNotEmpty() }.joinToString(" ")
@@ -141,6 +143,8 @@ object Osm {
         val h = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
         return 2 * 6371.0 * asin(sqrt(h))
     }
+
+    private val ROAD_NUMBER = Regex("[0-9][0-9;/ ]*")
 
     private fun fmt(v: Double): String = String.format(Locale.US, "%.6f", v)
 

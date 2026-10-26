@@ -59,11 +59,31 @@ data class DePrice(
     val diesel: Double?,
     val status: String,
     val fetchedAt: Long,
+    /**
+     * Zeitpunkt, zu dem die Preise abgerufen wurden. Geschlossene Tankstellen liefern bei Tankerkönig
+     * keine Preise; dann bleiben die letzten bekannten Preise stehen und [pricedAt] liegt vor [fetchedAt].
+     */
+    val pricedAt: Long = fetchedAt,
 ) {
+    val hasPrices: Boolean get() = e5 != null || e10 != null || diesel != null
+
+    /** Preise stammen aus einer früheren Abfrage (Tankstelle inzwischen geschlossen). */
+    val isStale: Boolean get() = hasPrices && pricedAt < fetchedAt
+
     fun priceFor(fuel: Fuel): Double? = when (fuel) {
         Fuel.E5 -> e5
         Fuel.E10 -> e10
         Fuel.DIESEL -> diesel
+    }
+
+    companion object {
+        /** Neue Abfrage ohne Preise (z. B. geschlossen): letzte bekannte Preise derselben Tankstelle behalten. */
+        fun merge(previous: DePrice?, fresh: DePrice): DePrice =
+            if (!fresh.hasPrices && previous != null && previous.stationId == fresh.stationId && previous.hasPrices) {
+                fresh.copy(e5 = previous.e5, e10 = previous.e10, diesel = previous.diesel, pricedAt = previous.pricedAt)
+            } else {
+                fresh
+            }
     }
 }
 

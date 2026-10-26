@@ -195,8 +195,13 @@ private fun GermanCard(station: GermanStation, fuel: Fuel, de: DePrice?) {
                     if (de != null) {
                         append(" · ")
                         append(Fmt.status(de.status))
-                        append(" · Stand ")
-                        append(Fmt.time(de.fetchedAt))
+                        if (de.isStale) {
+                            append(" · letzter Preis vom ")
+                            append(Fmt.time(de.pricedAt))
+                        } else {
+                            append(" · Stand ")
+                            append(Fmt.time(de.fetchedAt))
+                        }
                     }
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -215,7 +220,8 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
     } else {
         null
     }
-    val de = m.de?.takeIf { it.stationId == s.german?.id }?.priceFor(s.fuel)
+    val dePrice = m.de?.takeIf { it.stationId == s.german?.id }
+    val de = dePrice?.priceFor(s.fuel)
 
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -252,6 +258,12 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
 
                 price.perEur == null -> Notice("Wechselkurs fehlt noch. Bitte oben aktualisieren.")
 
+                de == null && dePrice?.status == "closed" -> Notice(
+                    "Deine deutsche Tankstelle hat gerade geschlossen, und Tankerkönig liefert dann keinen " +
+                        "Preis. Sobald sie geöffnet hat, oben aktualisieren – danach bleibt der letzte Preis " +
+                        "auch nachts stehen.",
+                )
+
                 de == null -> Notice(
                     "Deutscher Preis fehlt. Prüfe in den Einstellungen Schlüssel und Tankstelle.",
                 )
@@ -263,6 +275,7 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
                     s = s,
                     rate = m.rate(station.country),
                     tomorrow = tomorrow,
+                    staleDeSince = dePrice?.takeIf { it.isStale }?.pricedAt,
                 )
             }
             if (station.lat != null && station.lng != null) {
@@ -301,6 +314,7 @@ private fun ResultBlock(
     s: Settings,
     rate: RateInfo?,
     tomorrow: TomorrowHint?,
+    staleDeSince: Long?,
 ) {
     val good = MaterialTheme.colorScheme.primary
     val bad = MaterialTheme.colorScheme.error
@@ -329,6 +343,13 @@ private fun ResultBlock(
         )
     }
     tomorrow?.let { TomorrowLine(it, station) }
+    staleDeSince?.let {
+        Text(
+            "Verglichen mit dem letzten deutschen Preis vom ${Fmt.time(it)} (Tankstelle gerade geschlossen).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
     ValueRow("Preisunterschied", Fmt.ctPerL(calc.diffPerL))
     ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(calc.grossSaving))

@@ -131,7 +131,8 @@ object JsonCodec {
                     .putOpt("e10", it.e10)
                     .putOpt("diesel", it.diesel)
                     .put("status", it.status)
-                    .put("fetchedAt", it.fetchedAt),
+                    .put("fetchedAt", it.fetchedAt)
+                    .put("pricedAt", it.pricedAt),
             )
         }
         put("czCaps", capsToJson(m.czCaps))
@@ -157,6 +158,7 @@ object JsonCodec {
                     diesel = it.dbl("diesel"),
                     status = it.optString("status"),
                     fetchedAt = it.optLong("fetchedAt"),
+                    pricedAt = it.optLong("pricedAt", it.optLong("fetchedAt")),
                 )
             },
             czCaps = capsFromJson(o.optJSONArray("czCaps")),

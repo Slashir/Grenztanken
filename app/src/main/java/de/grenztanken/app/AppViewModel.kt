@@ -103,9 +103,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (m.de?.stationId != station.id || age > minAge) {
                     try {
                         val p = Tankerkoenig.prices(s.apiKey, listOf(station.id))[station.id]
-                        m = m.copy(
-                            de = DePrice(station.id, p?.e5, p?.e10, p?.diesel, p?.status ?: "no prices", now),
-                        )
+                        val fresh = DePrice(station.id, p?.e5, p?.e10, p?.diesel, p?.status ?: "no prices", now)
+                        m = m.copy(de = DePrice.merge(m.de, fresh))
                     } catch (e: Exception) {
                         errors += "Deutschland: ${errorText(e)}"
                     }
@@ -221,16 +220,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.updateSettings { it.copy(german = GermanStation(st.id, st.name, st.address, st.lat, st.lng)) }
             // Preise aus der Suche direkt übernehmen, spart eine Abfrage.
-            _market.value = _market.value.copy(
-                de = DePrice(
-                    stationId = st.id,
-                    e5 = st.e5,
-                    e10 = st.e10,
-                    diesel = st.diesel,
-                    status = if (st.isOpen) "open" else "closed",
-                    fetchedAt = System.currentTimeMillis(),
-                ),
+            val fresh = DePrice(
+                stationId = st.id,
+                e5 = st.e5,
+                e10 = st.e10,
+                diesel = st.diesel,
+                status = if (st.isOpen) "open" else "closed",
+                fetchedAt = System.currentTimeMillis(),
             )
+            _market.value = _market.value.copy(de = DePrice.merge(_market.value.de, fresh))
             repo.saveMarket(_market.value.copy(loading = false, errors = emptyList()))
         }
     }

@@ -41,6 +41,17 @@ class OsmTest {
     }
 
     @Test
+    fun strassennummer() {
+        val json = """[{"osm_type":"node","osm_id":9,"lat":"50.70","lon":"14.10","name":"RoBiN OIL Vilémov",
+            "address":{"road":"26510","village":"Dolina","postcode":"407 80","country_code":"cz"}},
+            {"osm_type":"node","osm_id":10,"lat":"50.81","lon":"14.96","name":"Orlen",
+            "address":{"road":"13;35","town":"Chrastava","country_code":"cz"}}]"""
+        val list = Osm.parseFuel(json, 50.7, 14.1)
+        assertEquals("Straße 26510, 407 80 Dolina", list[0].address)
+        assertEquals("Straße 13/35, Chrastava", list[1].address)
+    }
+
+    @Test
     fun namensersatz() {
         assertEquals("Orlen", Osm.displayName("", "Orlen", "Hlavní"))
         assertEquals("Tankstelle Hlavní", Osm.displayName("", "", "Hlavní"))
