@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.grenztanken.app.data.Geo
+import de.grenztanken.app.data.Osm
 import de.grenztanken.app.data.Repo
 import de.grenztanken.app.data.Sources
 import de.grenztanken.app.data.Tankerkoenig
@@ -15,6 +16,7 @@ import de.grenztanken.app.model.ForeignStation
 import de.grenztanken.app.model.GermanStation
 import de.grenztanken.app.model.Market
 import de.grenztanken.app.model.Settings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +37,15 @@ data class SearchState(
     val error: String? = null,
 )
 
+/** Suche nach Tankstellen in Tschechien und Polen über OpenStreetMap. */
+data class OsmSearchState(
+    val loading: Boolean = false,
+    val results: List<Osm.FuelStation> = emptyList(),
+    val error: String? = null,
+    /** Wurde das Trefferlimit erreicht? Dann gibt es vermutlich weitere Tankstellen im Umkreis. */
+    val truncated: Boolean = false,
+)
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repo(app)
 
@@ -46,6 +57,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _search = MutableStateFlow(SearchState())
     val search: StateFlow<SearchState> = _search.asStateFlow()
+
+    private val _osmSearch = MutableStateFlow(OsmSearchState())
+    val osmSearch: StateFlow<OsmSearchState> = _osmSearch.asStateFlow()
+    private var osmJob: Job? = null
 
     private var refreshJob: Job? = null
     private val loadLock = Mutex()
@@ -204,7 +219,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectGerman(st: Tankerkoenig.Station) {
         viewModelScope.launch {
-            repo.updateSettings { it.copy(german = GermanStation(st.id, st.name, st.address)) }
+            repo.updateSettings { it.copy(german = GermanStation(st.id, st.name, st.address, st.lat, st.lng)) }
             // Preise aus der Suche direkt übernehmen, spart eine Abfrage.
             _market.value = _market.value.copy(
                 de = DePrice(
@@ -253,6 +268,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 SearchState(error = errorText(e))
             }
         }
+    }
+
+    // ---- Auslandstankstellen über OpenStreetMap ----
+
+    fun osmSearchAroundGerman() = runOsmSearch {
+        germanCoords() ?: throw IllegalStateException(
+            "Bitte zuerst in den Einstellungen deine deutsche Tankstelle wählen.",
+        )
+    }
+
+    fun osmSearchAroundPlace(query: String) = runOsmSearch {
+        Osm.place(query) ?: throw IllegalStateException("Ort nicht gefunden.")
+    }
+
+    fun clearOsmSearch() {
+        osmJob?.cancel()
+        _osmSearch.value = OsmSearchState()
+    }
+
+    private fun runOsmSearch(center: suspend () -> Pair<Double, Double>) {
+        osmJob?.cancel()
+        osmJob = viewModelScope.launch {
+            _osmSearch.value = OsmSearchState(loading = true)
+            _osmSearch.value = try {
+                val (lat, lng) = center()
+                val list = Osm.fuelNear(lat, lng)
+                OsmSearchState(
+                    results = list,
+                    error = if (list.isEmpty()) {
+                        "Keine Tankstellen in Tschechien oder Polen im Umkreis von " +
+                            "${Osm.RADIUS_KM.toInt()} km gefunden."
+                    } else {
+                        null
+                    },
+                    truncated = list.size >= Osm.LIMIT,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OsmSearchState(error = errorText(e))
+            }
+        }
+    }
+
+    /**
+     * Autostrecke (einfach) von der deutschen Tankstelle zu (lat, lng).
+     * Liefert eine Fehlermeldung statt einer Zahl, wenn das nicht geht.
+     */
+    suspend fun routeKmFromGerman(lat: Double, lng: Double): Result<Double> = try {
+        val (fromLat, fromLng) = germanCoords()
+            ?: throw IllegalStateException("Keine deutsche Tankstelle gewählt.")
+        val km = Osm.routeKm(fromLat, fromLng, lat, lng)
+            ?: throw IllegalStateException("Keine Autoroute gefunden.")
+        Result.success(km)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(IllegalStateException(errorText(e)))
+    }
+
+    /** Koordinaten der deutschen Tankstelle; ältere Einträge ohne Koordinaten werden einmal nachgeladen. */
+    private suspend fun germanCoords(): Pair<Double, Double>? {
+        val s = repo.settings.first()
+        val g = s.german ?: return null
+        if (g.lat != null && g.lng != null) return g.lat to g.lng
+        if (s.apiKey.isBlank()) return null
+        val c = Tankerkoenig.coords(s.apiKey, g.id) ?: return null
+        repo.updateSettings { cur ->
+            if (cur.german?.id == g.id) cur.copy(german = cur.german.copy(lat = c.first, lng = c.second)) else cur
+        }
+        return c
     }
 
     companion object {

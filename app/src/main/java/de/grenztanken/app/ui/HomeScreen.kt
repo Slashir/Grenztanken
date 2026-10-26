@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.grenztanken.app.OsmSearchState
 import de.grenztanken.app.logic.Calc
 import de.grenztanken.app.logic.ForeignPrice
 import de.grenztanken.app.logic.PriceResolver
@@ -71,6 +73,11 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onSaveForeign: (ForeignStation) -> Unit,
     onDeleteForeign: (String) -> Unit,
+    osmSearch: OsmSearchState,
+    onOsmAroundGerman: () -> Unit,
+    onOsmAroundPlace: (String) -> Unit,
+    onOsmClear: () -> Unit,
+    routeKm: suspend (Double, Double) -> Result<Double>,
 ) {
     var editing by remember { mutableStateOf<ForeignStation?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -139,6 +146,12 @@ fun HomeScreen(
     if (creating || editing != null) {
         ForeignDialog(
             initial = editing,
+            hasGerman = settings.german != null,
+            osmSearch = osmSearch,
+            onOsmAroundGerman = onOsmAroundGerman,
+            onOsmAroundPlace = onOsmAroundPlace,
+            onOsmClear = onOsmClear,
+            routeKm = routeKm,
             onDismiss = { creating = false; editing = null },
             onSave = {
                 onSaveForeign(it)
@@ -218,6 +231,13 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (station.address.isNotBlank()) {
+                Text(
+                    station.address,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 "${Fmt.km(station.oneWayKm)} einfache Strecke · ${station.country.label}",
                 style = MaterialTheme.typography.bodySmall,
@@ -245,8 +265,21 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
                     tomorrow = tomorrow,
                 )
             }
+            if (station.lat != null && station.lng != null) {
+                val uri = LocalUriHandler.current
+                TextButton(onClick = { uri.openUri(mapsRouteUrl(s.german, station.lat, station.lng)) }) {
+                    Icon(Icons.Filled.Place, contentDescription = null)
+                    Text("  Route in Google Maps")
+                }
+            }
         }
     }
+}
+
+/** Google-Maps-Routen-Link (ohne API); ohne Koordinaten der deutschen Tankstelle ab aktuellem Standort. */
+private fun mapsRouteUrl(german: GermanStation?, lat: Double, lng: Double): String {
+    val origin = if (german?.lat != null && german.lng != null) "&origin=${german.lat},${german.lng}" else ""
+    return "https://www.google.com/maps/dir/?api=1$origin&destination=$lat,$lng&travelmode=driving"
 }
 
 private fun sourceLabel(p: ForeignPrice): String = when (p.source) {
@@ -422,13 +455,19 @@ private fun SourcesFooter() {
             "Preise Deutschland: Tankerkönig, Daten der Markttransparenzstelle für Kraftstoffe (MTS-K), " +
                 "Lizenz CC BY 4.0. Höchstpreise: Finanzministerium Tschechien, Energieministerium Polen. " +
                 "Kurse: ČNB, NBP. Richtwerte ohne Höchstpreis: EU Weekly Oil Bulletin über fuel-prices.eu, " +
-                "CC BY 4.0. Höchstpreise sind Obergrenzen, an der Säule kann es günstiger sein. " +
+                "CC BY 4.0. Tankstellensuche: © OpenStreetMap-Mitwirkende (ODbL) über Nominatim, " +
+                "Strecken: OSRM. Höchstpreise sind Obergrenzen, an der Säule kann es günstiger sein. " +
                 "Fahrtkosten nur Sprit, ohne Verschleiß. Alle Angaben ohne Gewähr.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) {
-            Text("tankerkoenig.de")
+        Row {
+            TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) {
+                Text("tankerkoenig.de")
+            }
+            TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) {
+                Text("OpenStreetMap")
+            }
         }
     }
 }

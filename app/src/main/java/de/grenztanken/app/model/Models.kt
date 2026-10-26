@@ -15,12 +15,19 @@ enum class Country(val code: String, val label: String, val currencySymbol: Stri
     PL("PL", "Polen", "zł", "🇵🇱"),
 }
 
-data class GermanStation(val id: String, val name: String, val address: String)
+data class GermanStation(
+    val id: String,
+    val name: String,
+    val address: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+)
 
 /**
- * Eine frei angelegte Tankstelle im Ausland.
+ * Eine Tankstelle im Ausland, frei angelegt oder aus der OpenStreetMap-Suche übernommen.
  * [oneWayKm] ist der zusätzliche Weg (einfache Strecke) gegenüber der deutschen Tankstelle.
  * Manuelle Preise sind in Landeswährung pro Liter; Benzin gilt für E5 und E10.
+ * [lat]/[lng] und [address] gibt es nur bei Tankstellen aus der Suche.
  */
 data class ForeignStation(
     val id: String,
@@ -29,6 +36,9 @@ data class ForeignStation(
     val oneWayKm: Double,
     val manualPetrol: Double? = null,
     val manualDiesel: Double? = null,
+    val address: String = "",
+    val lat: Double? = null,
+    val lng: Double? = null,
 ) {
     fun manualFor(fuel: Fuel): Double? = if (fuel.isDiesel) manualDiesel else manualPetrol
 }

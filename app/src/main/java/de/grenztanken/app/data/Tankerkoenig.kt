@@ -22,6 +22,8 @@ object Tankerkoenig {
         val e10: Double?,
         val diesel: Double?,
         val isOpen: Boolean,
+        val lat: Double?,
+        val lng: Double?,
     )
 
     data class PriceEntry(
@@ -48,8 +50,19 @@ object Tankerkoenig {
                 e10 = s.price("e10"),
                 diesel = s.price("diesel"),
                 isOpen = s.optBoolean("isOpen", false),
+                lat = s.coord("lat"),
+                lng = s.coord("lng"),
             )
         }
+    }
+
+    /** Koordinaten einer Tankstelle (für Tankstellen, die vor der Streckenberechnung gespeichert wurden). */
+    suspend fun coords(apiKey: String, id: String): Pair<Double, Double>? {
+        val o = request("$BASE/detail.php?id=${enc(id)}&apikey=${enc(apiKey)}")
+        val s = o.optJSONObject("station") ?: return null
+        val lat = s.coord("lat") ?: return null
+        val lng = s.coord("lng") ?: return null
+        return lat to lng
     }
 
     /** Preisabfrage für bis zu 10 Tankstellen. */
@@ -85,6 +98,9 @@ object Tankerkoenig {
     /** Preisfelder sind Zahlen oder `false`, wenn die Sorte nicht geführt wird. */
     private fun JSONObject.price(key: String): Double? =
         (opt(key) as? Number)?.toDouble()?.takeIf { it > 0.0 }
+
+    private fun JSONObject.coord(key: String): Double? =
+        (opt(key) as? Number)?.toDouble()?.takeIf { it != 0.0 }
 
     private fun JSONObject.text(key: String): String =
         optString(key, "").trim().takeIf { it != "null" }.orEmpty()

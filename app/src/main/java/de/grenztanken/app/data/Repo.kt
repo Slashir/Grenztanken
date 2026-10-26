@@ -61,7 +61,15 @@ object JsonCodec {
         put("consumption", s.consumption)
         put("liters", s.liters)
         s.german?.let {
-            put("german", JSONObject().put("id", it.id).put("name", it.name).put("address", it.address))
+            put(
+                "german",
+                JSONObject()
+                    .put("id", it.id)
+                    .put("name", it.name)
+                    .put("address", it.address)
+                    .putOpt("lat", it.lat)
+                    .putOpt("lng", it.lng),
+            )
         }
         val foreign = JSONArray()
         s.foreign.forEach { f ->
@@ -72,7 +80,10 @@ object JsonCodec {
                     .put("country", f.country.name)
                     .put("oneWayKm", f.oneWayKm)
                     .putOpt("manualPetrol", f.manualPetrol)
-                    .putOpt("manualDiesel", f.manualDiesel),
+                    .putOpt("manualDiesel", f.manualDiesel)
+                    .put("address", f.address)
+                    .putOpt("lat", f.lat)
+                    .putOpt("lng", f.lng),
             )
         }
         put("foreign", foreign)
@@ -91,6 +102,9 @@ object JsonCodec {
                         oneWayKm = f.optDouble("oneWayKm", 0.0),
                         manualPetrol = f.dbl("manualPetrol"),
                         manualDiesel = f.dbl("manualDiesel"),
+                        address = f.optString("address"),
+                        lat = f.dbl("lat"),
+                        lng = f.dbl("lng"),
                     )
                 }.getOrNull()
             }
@@ -101,7 +115,7 @@ object JsonCodec {
             consumption = o.optDouble("consumption", 7.0),
             liters = o.optDouble("liters", 50.0),
             german = o.optJSONObject("german")?.let {
-                GermanStation(it.getString("id"), it.optString("name"), it.optString("address"))
+                GermanStation(it.getString("id"), it.optString("name"), it.optString("address"), it.dbl("lat"), it.dbl("lng"))
             },
             foreign = foreign,
         )

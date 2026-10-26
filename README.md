@@ -7,7 +7,9 @@ deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 
 - **Deutschland:** aktueller Preis deiner gewählten Tankstelle (E5, E10 oder Diesel) über die
   Tankerkönig-API (Daten der Markttransparenzstelle für Kraftstoffe).
-- **Tschechien / Polen:** frei angelegte Tankstellen mit Strecke. Welcher Preis genutzt wird:
+- **Tschechien / Polen:** Tankstellen per OpenStreetMap-Suche (rund um die deutsche Tankstelle oder
+  um einen Ort) oder frei angelegt. Bei Tankstellen aus der Suche berechnet die App die Autostrecke
+  ab der deutschen Tankstelle selbst und bietet „Route in Google Maps“ an. Welcher Preis genutzt wird:
   1. dein Preis von der Säule, wenn eingetragen
   2. der amtliche Höchstpreis für heute
   3. der amtliche Höchstpreis ab morgen (falls der heutige nicht mehr abrufbar war)
@@ -41,6 +43,8 @@ bewusst nicht eingerechnet.
 | Kurs CZK | ČNB `denni_kurz.txt` | |
 | Kurs PLN | NBP API, Tabelle A | |
 | Richtwert CZ/PL | EU Weekly Oil Bulletin über `fuel-prices.eu` (`/lang/api/country-history.php?cc=CZ`) | wöchentlich, EUR/l inkl. Steuern, CC BY 4.0; Landesdurchschnitt |
+| Tankstellensuche CZ/PL | OpenStreetMap über Nominatim (`nominatim.openstreetmap.org`, `amenity=fuel`) | © OpenStreetMap-Mitwirkende, ODbL; höchstens 1 Anfrage/s, nur auf Nutzeraktion |
+| Strecke | OSRM-Demoserver (`router.project-osrm.org`) | Autostrecke einfach, ab der deutschen Tankstelle |
 
 **Grenzen:**
 - Höchstpreise sind Obergrenzen. An der Säule ist es oft günstiger, dann rechnet die App vorsichtig.
@@ -52,7 +56,12 @@ bewusst nicht eingerechnet.
 - Die polnischen Bekanntmachungen werden über das Muster ihrer Webadresse gefunden
   (`…-obowiazujaca-21-pazdziernika-2026-r` bzw. `…-w-dniach-24-26-pazdziernika-2026-r`).
   Ändert das Ministerium das Muster, muss `Parsers.plCandidates` angepasst werden.
-- Die Ortssuche nutzt den Geocoder des Geräts. Auf Geräten ohne Google-Dienste kann er leer
+- Nominatim und der OSRM-Demoserver sind öffentliche Server für geringe Last. Für eine
+  Veröffentlichung mit vielen Nutzern einen eigenen oder kommerziellen Dienst eintragen (`data/Osm.kt`).
+  Die Suche liefert höchstens 40 Treffer im Umkreis von 15 km; in dichten Gegenden den Ort genauer wählen.
+- Die Strecke bezieht sich auf die deutsche Tankstelle zum Zeitpunkt der Berechnung. Nach einem
+  Wechsel der deutschen Tankstelle im Dialog „Strecke neu berechnen“ tippen.
+- Die Ortssuche für die deutsche Tankstelle nutzt den Geocoder des Geräts. Auf Geräten ohne Google-Dienste kann er leer
   bleiben; dann „In der Nähe“ nutzen.
 
 ## Bauen
@@ -123,9 +132,10 @@ app/src/main/java/de/grenztanken/app/
   data/Parsers.kt        Text-Parser (getestet)
   data/Repo.kt           lokale Speicherung (DataStore)
   data/Geo.kt            Ortssuche, Standort
+  data/Osm.kt            Tankstellensuche CZ/PL (Nominatim), Strecke (OSRM) (Parser getestet)
   logic/Calc.kt          Rechnung (getestet)
   logic/PriceResolver.kt Preisquelle wählen, Morgen-Hinweis (getestet)
   Config.kt              optionale Relay-Adresse für EU-Werte
   ui/                    Compose-Oberfläche
-app/src/test/            Unit-Tests für Rechnung, Preisquelle und Parser
+app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser und OSM-Suche
 ```

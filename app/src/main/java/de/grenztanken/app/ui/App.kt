@@ -18,6 +18,7 @@ fun GrenztankenApp(vm: AppViewModel = viewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val market by vm.market.collectAsStateWithLifecycle()
     val search by vm.search.collectAsStateWithLifecycle()
+    val osmSearch by vm.osmSearch.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
 
     // Beim Öffnen und bei jeder Rückkehr in die App aktualisieren (mit Mindestabständen).
@@ -39,6 +40,11 @@ fun GrenztankenApp(vm: AppViewModel = viewModel()) {
                 onOpenSettings = { screen = Screen.Settings },
                 onSaveForeign = vm::saveForeign,
                 onDeleteForeign = vm::deleteForeign,
+                osmSearch = osmSearch,
+                onOsmAroundGerman = vm::osmSearchAroundGerman,
+                onOsmAroundPlace = vm::osmSearchAroundPlace,
+                onOsmClear = vm::clearOsmSearch,
+                routeKm = vm::routeKmFromGerman,
             )
 
             Screen.Settings -> SettingsScreen(
