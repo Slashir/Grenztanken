@@ -65,8 +65,14 @@ bewusst nicht eingerechnet.
 
 ### Lokal
 
-Projekt in Android Studio öffnen. Ein Gradle-Wrapper ist nicht enthalten; Android Studio nutzt
-seinen eigenen, oder einmalig `gradle wrapper --gradle-version 8.11.1` ausführen.
+Projekt in Android Studio öffnen, oder auf der Kommandozeile (JDK 17 oder neuer, Android-SDK in
+`local.properties` als `sdk.dir` eingetragen):
+
+```
+gradlew testDebugUnitTest assembleDebug
+```
+
+Die APK liegt dann unter `app/build/outputs/apk/debug/app-debug.apk`. Der Wrapper nutzt Gradle 8.13.
 
 ## Optional: EU-Werte über das eigene Repo verteilen
 
