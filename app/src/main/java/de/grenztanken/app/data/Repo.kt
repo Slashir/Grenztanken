@@ -60,6 +60,7 @@ object JsonCodec {
         put("fuel", s.fuel.name)
         put("consumption", s.consumption)
         put("liters", s.liters)
+        put("wearCentPerKm", s.wearCentPerKm)
         s.german?.let {
             put(
                 "german",
@@ -114,6 +115,7 @@ object JsonCodec {
             fuel = runCatching { Fuel.valueOf(o.optString("fuel")) }.getOrDefault(Fuel.E10),
             consumption = o.optDouble("consumption", 7.0),
             liters = o.optDouble("liters", 50.0),
+            wearCentPerKm = o.optDouble("wearCentPerKm", 0.0),
             german = o.optJSONObject("german")?.let {
                 GermanStation(it.getString("id"), it.optString("name"), it.optString("address"), it.dbl("lat"), it.dbl("lng"))
             },

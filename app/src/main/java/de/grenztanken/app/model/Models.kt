@@ -48,6 +48,8 @@ data class Settings(
     val fuel: Fuel = Fuel.E10,
     val consumption: Double = 7.0,
     val liters: Double = 50.0,
+    /** Verschleiß, Wartung, Reifen, Wertverlust … in Cent pro gefahrenem km; 0 = nur Sprit rechnen. */
+    val wearCentPerKm: Double = 0.0,
     val german: GermanStation? = null,
     val foreign: List<ForeignStation> = emptyList(),
 )

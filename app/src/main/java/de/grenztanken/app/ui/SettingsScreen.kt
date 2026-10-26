@@ -51,6 +51,7 @@ fun SettingsScreen(
     var apiKey by remember { mutableStateOf(settings.apiKey) }
     var consumption by remember { mutableStateOf(Fmt.input(settings.consumption)) }
     var liters by remember { mutableStateOf(Fmt.input(settings.liters)) }
+    var wear by remember { mutableStateOf(Fmt.input(settings.wearCentPerKm.takeIf { it > 0.0 })) }
 
     Scaffold(
         topBar = {
@@ -136,6 +137,29 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
+                }
+                OutlinedTextField(
+                    value = wear,
+                    onValueChange = { value ->
+                        wear = value
+                        val v = if (value.isBlank()) 0.0 else Fmt.parse(value)?.takeIf { it >= 0.0 && it < 200.0 }
+                        v?.let { c -> onUpdate { it.copy(wearCentPerKm = c) } }
+                    },
+                    label = { Text("Verschleiß & Wartung in ct/km") },
+                    placeholder = { Text("leer = nur Sprit") },
+                    supportingText = {
+                        Text(
+                            "Kosten pro gefahrenem km außer Sprit, z. B. Werkstatt, Reifen, Wertverlust. " +
+                                "ADAC: Werkstatt-/Reifenkosten pro Monat ÷ km pro Monat.",
+                        )
+                    },
+                    isError = wear.isNotBlank() && Fmt.parse(wear)?.let { it >= 0.0 && it < 200.0 } != true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = { uri.openUri("https://www.adac.de/rund-ums-fahrzeug/auto-kaufen-verkaufen/autokosten/uebersicht/") }) {
+                    Text("ADAC-Autokosten öffnen")
                 }
             }
 

@@ -16,22 +16,25 @@ deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
   4. der EU-Wochendurchschnitt des Landes als Richtwert
 - **Morgen-Hinweis:** Ist der Höchstpreis für morgen schon verkündet, zeigt die Karte, ob es
   morgen günstiger oder teurer wird.
-- **Rechnung pro Tankstelle:** Preisunterschied, Ersparnis bei deiner Tankmenge, Spritkosten für
-  Hin- und Rückweg, Ergebnis unterm Strich und die einfache Strecke, bis zu der es sich rechnet.
+- **Rechnung pro Tankstelle:** Preisunterschied, Ersparnis bei deiner Tankmenge, Spritkosten und
+  (optional) Verschleiß für Hin- und Rückweg, Ergebnis unterm Strich und die einfache Strecke, bis zu
+  der es sich rechnet.
 
 ## Rechenweg
 
 ```
 Auslandspreis €/l  = Preis Landeswährung / Kurs
 Ersparnis brutto   = Liter × (Preis DE − Preis Ausland)
-Kosten pro km      = Verbrauch / 100 × Preis Ausland
+Sprit pro km       = Verbrauch / 100 × Preis Ausland
+Kosten pro km      = Sprit pro km + Verschleiß pro km (Einstellung, Standard 0)
 Fahrtkosten        = 2 × Strecke einfach × Kosten pro km
 Unterm Strich      = Ersparnis brutto − Fahrtkosten
 Lohnt sich bis     = Ersparnis brutto / Kosten pro km / 2   (einfache Strecke)
 ```
 
-Annahme: Der Sprit für die Fahrt wird im Ausland nachgetankt. Verschleiß und Zeit sind
-bewusst nicht eingerechnet.
+Annahme: Der Sprit für die Fahrt wird im Ausland nachgetankt. Verschleiß (Werkstatt, Reifen,
+Wertverlust …) trägt jeder selbst in ct/km ein, z. B. aus den ADAC-Autokosten
+(Werkstatt-/Reifenkosten pro Monat ÷ gefahrene km pro Monat). Zeit ist bewusst nicht eingerechnet.
 
 ## Datenquellen
 

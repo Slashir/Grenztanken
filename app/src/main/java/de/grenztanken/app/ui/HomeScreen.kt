@@ -128,7 +128,12 @@ fun HomeScreen(
             item {
                 Text(
                     "${settings.fuel.label} · ${Fmt.dec(settings.consumption, 1)} l/100 km · " +
-                        "${Fmt.dec(settings.liters, 0)} l tanken",
+                        "${Fmt.dec(settings.liters, 0)} l tanken" +
+                        if (settings.wearCentPerKm > 0.0) {
+                            " · Verschleiß ${Fmt.dec(settings.wearCentPerKm, 1)} ct/km"
+                        } else {
+                            " · ohne Verschleiß"
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -269,7 +274,10 @@ private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick
                 )
 
                 else -> ResultBlock(
-                    calc = Calc.compute(de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm),
+                    calc = Calc.compute(
+                        de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm,
+                        wearEurPerKm = s.wearCentPerKm / 100.0,
+                    ),
                     price = price,
                     station = station,
                     s = s,
@@ -353,7 +361,13 @@ private fun ResultBlock(
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
     ValueRow("Preisunterschied", Fmt.ctPerL(calc.diffPerL))
     ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(calc.grossSaving))
-    ValueRow("Fahrt hin und zurück (${Fmt.km(2 * station.oneWayKm)})", "− " + Fmt.eur(calc.tripCost))
+    ValueRow("Sprit hin und zurück (${Fmt.km(2 * station.oneWayKm)})", "− " + Fmt.eur(calc.tripFuelCost))
+    if (calc.wearPerKm > 0.0) {
+        ValueRow(
+            "Verschleiß (${Fmt.km(2 * station.oneWayKm)} × ${Fmt.dec(calc.wearPerKm * 100.0, 1)} ct)",
+            "− " + Fmt.eur(calc.tripWearCost),
+        )
+    }
     ValueRow(
         "Unterm Strich",
         Fmt.eurSigned(calc.netSaving),
@@ -478,7 +492,8 @@ private fun SourcesFooter() {
                 "Kurse: ČNB, NBP. Richtwerte ohne Höchstpreis: EU Weekly Oil Bulletin über fuel-prices.eu, " +
                 "CC BY 4.0. Tankstellensuche: © OpenStreetMap-Mitwirkende (ODbL) über Nominatim, " +
                 "Strecken: OSRM. Höchstpreise sind Obergrenzen, an der Säule kann es günstiger sein. " +
-                "Fahrtkosten nur Sprit, ohne Verschleiß. Alle Angaben ohne Gewähr.",
+                "Fahrtkosten: Sprit zum Auslandspreis plus dein Verschleißwert aus den Einstellungen, " +
+                "ohne Zeit. Alle Angaben ohne Gewähr.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

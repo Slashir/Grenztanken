@@ -30,6 +30,19 @@ class CalcTest {
     }
 
     @Test
+    fun verschleissWirdAbgezogen() {
+        // wie oben, zusätzlich 8 ct/km Verschleiß: 60 km × 0,08 € = 4,80 €
+        val c = Calc.compute(2.10, 44.55, 24.33, 50.0, 7.0, 30.0, wearEurPerKm = 0.08)
+        assertEquals(7.6905, c.tripFuelCost, 1e-3)
+        assertEquals(4.80, c.tripWearCost, 1e-9)
+        assertEquals(0.9559, c.netSaving, 1e-3)
+        // Break-even: 13,4464 € / (0,128175 + 0,08) €/km / 2
+        assertEquals(32.296, c.breakEvenOneWayKm!!, 1e-2)
+        val atBreakEven = Calc.compute(2.10, 44.55, 24.33, 50.0, 7.0, c.breakEvenOneWayKm!!, wearEurPerKm = 0.08)
+        assertEquals(0.0, atBreakEven.netSaving, 1e-9)
+    }
+
+    @Test
     fun auslandTeurerLohntNie() {
         val c = Calc.compute(1.70, 46.0, 24.0, 50.0, 7.0, 5.0)
         assertNull(c.breakEvenOneWayKm)
