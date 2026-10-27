@@ -3,6 +3,10 @@
 Android-App (Kotlin, Jetpack Compose): Lohnt sich das Tanken in Tschechien oder Polen gegenüber
 deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 
+Dir hilft die App? Über Ko-fi kannst du mir einen Kaffee ausgeben:
+
+[![Unterstütze Slashir auf Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/slashir)
+
 > **Vor dem ersten Start: eigenen API-Schlüssel bei Tankerkönig beantragen.**
 > Für die Preise in Deutschland braucht jeder Nutzer einen eigenen, persönlichen Schlüssel von
 > Tankerkönig. Er ist **kostenlos** und schnell beantragt: <https://onboarding.tankerkoenig.de/>.
