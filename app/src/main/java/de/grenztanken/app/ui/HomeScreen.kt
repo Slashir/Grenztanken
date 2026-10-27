@@ -234,16 +234,12 @@ private fun ForeignCard(station: ForeignStation, evaluation: Evaluation, s: Sett
     val good = ready?.calc?.worthIt == true
     var expanded by rememberSaveable(station.id) { mutableStateOf(false) }
 
+    // Karte nur leicht getönt, Text neutral; farbig sind nur Urteil und Betrag.
     AppCard(
         containerColor = when {
             ready == null -> MaterialTheme.colorScheme.surfaceContainer
-            good -> r.goodContainer
-            else -> r.badContainer
-        },
-        contentColor = when {
-            ready == null -> MaterialTheme.colorScheme.onSurface
-            good -> r.onGoodContainer
-            else -> r.onBadContainer
+            good -> r.goodCard
+            else -> r.badCard
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -274,6 +270,7 @@ private fun ForeignCard(station: ForeignStation, evaluation: Evaluation, s: Sett
                     Text(
                         if (good) "Lohnt sich" else "Lohnt sich nicht",
                         style = MaterialTheme.typography.titleLarge,
+                        color = if (good) r.good else r.bad,
                         modifier = Modifier
                             .weight(1f)
                             .padding(bottom = 4.dp),

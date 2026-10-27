@@ -98,6 +98,12 @@ data class ResultColors(
     val bad: Color,
     val badContainer: Color,
     val onBadContainer: Color,
+    /**
+     * Hintergrund der Ergebniskarten: nur leicht getönt. Text darauf bleibt neutral (onSurface),
+     * farbig sind nur Urteil und Betrag – Grün auf Grün ist besonders im Dunkeln schlecht lesbar.
+     */
+    val goodCard: Color,
+    val badCard: Color,
 )
 
 private val LightResult = ResultColors(
@@ -107,6 +113,8 @@ private val LightResult = ResultColors(
     bad = Color(0xFFB3261E),
     badContainer = Color(0xFFFCE4E1),
     onBadContainer = Color(0xFF5C0E09),
+    goodCard = Color(0xFFE6F4EA),
+    badCard = Color(0xFFFBEAE7),
 )
 
 private val DarkResult = ResultColors(
@@ -116,6 +124,8 @@ private val DarkResult = ResultColors(
     bad = Color(0xFFFF9C92),
     badContainer = Color(0xFF4A1612),
     onBadContainer = Color(0xFFFFDAD6),
+    goodCard = Color(0xFF18271E),
+    badCard = Color(0xFF2B1B1A),
 )
 
 val LocalResultColors = staticCompositionLocalOf { LightResult }
