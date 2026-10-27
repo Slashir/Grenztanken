@@ -121,7 +121,9 @@ und Land, nur wenn kein Höchstpreis gilt). Bei vielen Nutzern ist es fairer, di
 Woche selbst abzulegen:
 
 1. Workflow **EU-Wochenpreise** einmal manuell starten (Actions → EU-Wochenpreise → Run workflow).
-   Er legt `data/eu-CZ.json` und `data/eu-PL.json` ab und aktualisiert sie jeden Freitag.
+   Er legt `data/eu-CZ.json` und `data/eu-PL.json` ab. Der Zeitplan (jeden Freitag) ist
+   abgeschaltet; zum automatischen Aktualisieren den `schedule`-Block in
+   `.github/workflows/eu-weekly.yml` wieder einkommentieren.
 2. In `app/src/main/java/de/grenztanken/app/Config.kt` setzen:
    `EU_RELAY_BASE_URL = "https://raw.githubusercontent.com/<nutzer>/<repo>/main/data/"`
 3. Neu bauen. Das Repository muss dafür öffentlich sein.

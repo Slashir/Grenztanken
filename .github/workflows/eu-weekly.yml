@@ -3,10 +3,11 @@
 # Quelle: EU Weekly Oil Bulletin über fuel-prices.eu, CC BY 4.0.
 name: EU-Wochenpreise
 
+# Abgeschaltet: läuft nur, wenn man ihn unter Actions von Hand startet.
+# Zum automatischen Betrieb (freitags, das Bulletin erscheint donnerstags) wieder ergänzen:
+#   schedule:
+#     - cron: "17 6 * * 5"
 on:
-  schedule:
-    # Freitags 06:17 UTC; das Bulletin erscheint donnerstags.
-    - cron: "17 6 * * 5"
   workflow_dispatch:
 
 permissions:
