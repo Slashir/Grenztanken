@@ -64,6 +64,24 @@ const val COPYRIGHT_HOLDER = "Slashir"
 
 fun copyrightLine(): String = "© ${Year.now().value} $COPYRIGHT_HOLDER"
 
+/** Freiwillige Unterstützung des Entwicklers. */
+const val KOFI_URL = "https://ko-fi.com/slashir"
+
+/** "© 2026 Slashir" mit dezentem Ko-fi-Link daneben. */
+@Composable
+fun CopyrightRow(modifier: Modifier = Modifier) {
+    val uri = LocalUriHandler.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            copyrightLine(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { uri.openUri(KOFI_URL) }) { Text("Auf Ko-fi unterstützen") }
+    }
+}
+
 /** Karte im App-Stil: flach, große Rundung. */
 @Composable
 fun AppCard(
@@ -356,7 +374,7 @@ fun SourcesDialog(onDismiss: () -> Unit) {
                     TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) { Text("Tankerkönig") }
                     TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) { Text("OpenStreetMap") }
                 }
-                Text(copyrightLine(), style = MaterialTheme.typography.labelLarge)
+                CopyrightRow()
             }
         },
     )

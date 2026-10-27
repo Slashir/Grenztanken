@@ -285,12 +285,7 @@ fun SettingsScreen(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                copyrightLine(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-            )
+            CopyrightRow(Modifier.padding(start = 4.dp))
         }
     }
     if (showSources) SourcesDialog(onDismiss = { showSources = false })

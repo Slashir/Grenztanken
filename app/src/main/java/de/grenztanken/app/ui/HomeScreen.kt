@@ -626,13 +626,10 @@ private fun Footer(onSources: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onSources, contentPadding = PaddingValues(horizontal = 0.dp)) {
-                Text("Quellen & Lizenzen")
-            }
-            Spacer(Modifier.weight(1f))
-            Text(copyrightLine(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = onSources, contentPadding = PaddingValues(horizontal = 0.dp)) {
+            Text("Quellen & Lizenzen")
         }
+        CopyrightRow()
     }
 }
 
