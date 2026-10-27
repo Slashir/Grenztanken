@@ -51,13 +51,35 @@ jobs:
           export SIGNING_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
           ./gradlew testReleaseUnitTest assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk "grenztanken-$TAG.apk"
+          # Zusätzlich unter festem Namen, damit .../releases/latest/download/grenztanken.apk immer funktioniert.
+          cp app/build/outputs/apk/release/app-release.apk grenztanken.apk
+
+      - name: Text für die Release-Seite
+        run: |
+          cat > notes.md <<EOF
+          Dir hilft die App? Über Ko-fi kannst du mir einen Kaffee ausgeben:
+
+          [![Unterstütze Slashir auf Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/slashir)
+
+          ## Installation
+
+          1. Unten unter **Assets** auf \`grenztanken-$TAG.apk\` tippen und herunterladen.
+          2. Datei öffnen. Android fragt einmal, ob der Browser Apps installieren darf: erlauben.
+          3. In der App unter *Einstellungen* einen eigenen Tankerkönig-Schlüssel eintragen.
+             Er ist **kostenlos** und schnell beantragt: https://onboarding.tankerkoenig.de/
+
+          Updates installieren sich über die bisherige Version, die Einstellungen bleiben erhalten.
+          Mehr zur App: https://github.com/${{ github.repository }}
+          EOF
 
       - name: GitHub-Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "grenztanken-$TAG.apk" --clobber
+            gh release upload "$TAG" "grenztanken-$TAG.apk" grenztanken.apk --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" "grenztanken-$TAG.apk" --title "Grenztanken $TAG" --generate-notes --target "$GITHUB_SHA"
+            gh release create "$TAG" "grenztanken-$TAG.apk" grenztanken.apk --title "Grenztanken $TAG" \
+              --notes-file notes.md --generate-notes --target "$GITHUB_SHA"
           fi
