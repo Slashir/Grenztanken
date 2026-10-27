@@ -9,6 +9,16 @@ deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 > Den Schlüssel in der App unter *Einstellungen → Tankerkönig-Schlüssel* eintragen. Er bleibt auf dem
 > Gerät und wird nur an Tankerkönig gesendet. Schlüssel nicht weitergeben und nicht veröffentlichen.
 
+## Installation
+
+1. Unter [Releases](https://github.com/Slashir/Grenztanken/releases) die neueste
+   `grenztanken-v….apk` auf dem Handy herunterladen.
+2. Datei öffnen. Android fragt einmal, ob der Browser Apps installieren darf: erlauben.
+3. App starten, unter *Einstellungen* den Tankerkönig-Schlüssel eintragen und die eigene deutsche
+   Tankstelle wählen.
+
+Neue Versionen installieren sich genauso über die alte, die Einstellungen bleiben erhalten.
+
 ## Was die App zeigt
 
 - **Deutschland:** aktueller Preis deiner gewählten Tankstelle (E5, E10 oder Diesel) über die
@@ -95,15 +105,7 @@ eingerechnet.
 - Die Ortssuche für die deutsche Tankstelle nutzt den Geocoder des Geräts. Auf Geräten ohne Google-Dienste kann er leer
   bleiben; dann „In der Nähe“ nutzen.
 
-## Bauen
-
-### Über GitHub (empfohlen)
-
-1. Neues Repository auf GitHub anlegen und dieses Projekt hineinpushen (Branch `main`).
-2. Unter **Actions** läuft „Build APK“: Unit-Tests, dann Debug-APK.
-3. Die APK liegt im Lauf unter **Artifacts → grenztanken-debug-apk**.
-
-### Lokal
+## Selbst bauen
 
 Projekt in Android Studio öffnen, oder auf der Kommandozeile (JDK 17 oder neuer, Android-SDK in
 `local.properties` als `sdk.dir` eingetragen):
@@ -127,55 +129,6 @@ Woche selbst abzulegen:
 2. In `app/src/main/java/de/grenztanken/app/Config.kt` setzen:
    `EU_RELAY_BASE_URL = "https://raw.githubusercontent.com/<nutzer>/<repo>/main/data/"`
 3. Neu bauen. Das Repository muss dafür öffentlich sein.
-
-## Signierte Release-Version (für Play Store / Weitergabe)
-
-1. Schlüssel einmalig erzeugen und **sicher aufbewahren** (ohne ihn keine Updates):
-   ```
-   keytool -genkeypair -v -keystore release.jks -alias grenztanken -keyalg RSA -keysize 4096 -validity 10000
-   base64 -w0 release.jks > release.jks.b64
-   ```
-2. In GitHub unter *Settings → Secrets and variables → Actions* anlegen:
-   `SIGNING_KEYSTORE_BASE64` (Inhalt von `release.jks.b64`), `SIGNING_STORE_PASSWORD`,
-   `SIGNING_KEY_ALIAS` (`grenztanken`), `SIGNING_KEY_PASSWORD`.
-3. Der nächste Lauf erzeugt zusätzlich **grenztanken-release** mit signierter APK und AAB.
-
-`release.jks` niemals ins Repository einchecken (steht in `.gitignore`).
-
-## Auf GitHub veröffentlichen
-
-1. Auf github.com ein neues, leeres Repository anlegen (ohne README, ohne Lizenz).
-2. Dieses Projekt hochladen:
-   ```
-   git remote add origin https://github.com/<nutzer>/grenztanken.git
-   git push -u origin main
-   ```
-3. Signaturschlüssel anlegen und als Secrets eintragen (Abschnitt „Signierte Release-Version“).
-4. Version veröffentlichen: `versionName`/`versionCode` in `app/build.gradle.kts` erhöhen, dann
-   ```
-   git tag v0.5.0
-   git push origin v0.5.0
-   ```
-   Der Workflow **Release** baut die signierte APK und hängt sie an ein GitHub-Release. Andere laden
-   sie dort unter *Releases* herunter und installieren sie (Installation aus unbekannten Quellen
-   erlauben). Updates installieren sich nur über eine Version mit demselben Schlüssel.
-
-## Veröffentlichen
-
-- **Namensnennung EU-Werte:** „Daten: fuel-prices.eu, CC BY 4.0“ (Quelle: EU Weekly Oil Bulletin)
-  steht in der App; auch in den Store-Text aufnehmen.
-- **Tankerkönig-Bedingungen:** Namensnennung (CC BY 4.0) in der App *und* im Store-Text,
-  z. B. „Preisdaten Deutschland: Tankerkönig (tankerkoenig.de), MTS-K, CC BY 4.0“.
-  API-Keys dürfen nicht veröffentlicht werden (auch nicht auf GitHub); jeder Nutzer trägt
-  seinen eigenen ein. Abfragen nur auf Nutzeraktion, keine Hintergrundabfragen.
-- **Play Store:** aktuelle Anforderungen in der Play Console prüfen (Ziel-API-Level,
-  Datenschutzerklärung – die App fragt optional den ungefähren Standort ab).
-- **ADAC:** Quelle „ADAC Autokatalog“ steht in der App. Die Daten werden nicht gespeichert oder
-  weiterverteilt, nur pro Nutzer und Auswahl abgerufen.
-- **Schrift:** Inter, SIL Open Font License 1.1; Lizenztext liegt in der App unter
-  `assets/licenses/Inter-OFL.txt`.
-- App-Name und Paketname (`de.grenztanken.app`) vor der ersten Veröffentlichung festlegen;
-  der Paketname lässt sich danach im Play Store nicht mehr ändern.
 
 ## Projektaufbau
 
