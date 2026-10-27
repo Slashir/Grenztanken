@@ -26,6 +26,10 @@ deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 - **Rechnung pro Tankstelle:** Preisunterschied, Ersparnis bei deiner Tankmenge, Spritkosten und
   (optional) Verschleiß für Hin- und Rückweg, Ergebnis unterm Strich und die einfache Strecke, bis zu
   der es sich rechnet.
+- **Verschleiß aus dem ADAC-Autokatalog:** Marke → Modell → Generation → Variante wählen; die App
+  übernimmt die Werkstatt- und Reifenkosten (optional Wertverlust und ADAC-Verbrauch) passend zur
+  eigenen Jahresfahrleistung und Haltedauer bzw. Leasinglaufzeit. Wer least und einen Wartungsvertrag hat, lässt das Feld leer
+  oder trägt nur den Mehrkilometer-Satz ein.
 
 ## Rechenweg
 
@@ -34,14 +38,22 @@ Auslandspreis €/l  = Preis Landeswährung / Kurs
 Ersparnis brutto   = Liter × (Preis DE − Preis Ausland)
 Sprit pro km       = Verbrauch / 100 × Preis Ausland
 Kosten pro km      = Sprit pro km + Verschleiß pro km (Einstellung, Standard 0)
+Verschleiß (ADAC)  = Zusatzkosten pro km: (Monatskosten bei km+5.000 − bei km−5.000) × 12 / 10.000
+                     (ADAC-Werte zwischen den Stufen linear umgerechnet)
 Fahrtkosten        = 2 × Strecke einfach × Kosten pro km
 Unterm Strich      = Ersparnis brutto − Fahrtkosten
 Lohnt sich bis     = Ersparnis brutto / Kosten pro km / 2   (einfache Strecke)
 ```
 
-Annahme: Der Sprit für die Fahrt wird im Ausland nachgetankt. Verschleiß (Werkstatt, Reifen,
-Wertverlust …) trägt jeder selbst in ct/km ein, z. B. aus den ADAC-Autokosten
-(Werkstatt-/Reifenkosten pro Monat ÷ gefahrene km pro Monat). Zeit ist bewusst nicht eingerechnet.
+Annahme: Der Sprit für die Fahrt wird im Ausland nachgetankt. Verschleiß trägt jeder selbst in ct/km
+ein oder übernimmt ihn aus dem ADAC-Autokatalog. Für neuere Varianten liefert der ADAC Werte für
+2–5 Jahre Haltedauer und 5.000–60.000 km pro Jahr (auf der Seite sichtbar ist nur 5 Jahre/15.000 km).
+Für den Umweg zählt, was jeder *zusätzliche* km kostet, nicht der Durchschnitt: Werkstatt und vor allem
+Wertverlust fallen zum großen Teil auch ohne Fahren an. Beispiel Tucson 1.6 T-GDI (ab 09/25), 5 Jahre:
+Werkstatt 69 € bei 10.000 km, 110 € bei 20.000 km → ein km mehr kostet 4,9 ct, der Durchschnitt bei
+15.000 km wäre 6,8 ct. Ältere Varianten haben nur einen Wert (5 Jahre, 15.000 km); dann nimmt die App
+den Durchschnitt der Werkstattkosten pro km und bietet keinen Wertverlust an. Zeit ist bewusst nicht
+eingerechnet.
 
 ## Datenquellen
 
@@ -55,6 +67,7 @@ Wertverlust …) trägt jeder selbst in ct/km ein, z. B. aus den ADAC-Autokosten
 | Richtwert CZ/PL | EU Weekly Oil Bulletin über `fuel-prices.eu` (`/lang/api/country-history.php?cc=CZ`) | wöchentlich, EUR/l inkl. Steuern, CC BY 4.0; Landesdurchschnitt |
 | Tankstellensuche CZ/PL | OpenStreetMap über Nominatim (`nominatim.openstreetmap.org`, `amenity=fuel`) | © OpenStreetMap-Mitwirkende, ODbL; höchstens 1 Anfrage/s, nur auf Nutzeraktion |
 | Strecke | OSRM-Demoserver (`router.project-osrm.org`) | Autostrecke einfach, ab der deutschen Tankstelle |
+| Autokosten | ADAC Autokatalog (`adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/…`) | keine offizielle Schnittstelle; die App liest die Daten, die jede Katalogseite als JSON (`window.__APOLLO_STATE__`) mitliefert, nur auf Nutzeraktion |
 
 **Grenzen:**
 - Höchstpreise sind Obergrenzen. An der Säule ist es oft günstiger, dann rechnet die App vorsichtig.
@@ -71,6 +84,8 @@ Wertverlust …) trägt jeder selbst in ct/km ein, z. B. aus den ADAC-Autokosten
   Die Suche liefert höchstens 40 Treffer im Umkreis von 15 km; in dichten Gegenden den Ort genauer wählen.
 - Die Strecke bezieht sich auf die deutsche Tankstelle zum Zeitpunkt der Berechnung. Nach einem
   Wechsel der deutschen Tankstelle im Dialog „Strecke neu berechnen“ tippen.
+- Der ADAC-Katalog hat keine offizielle Schnittstelle. Ändert der ADAC den Aufbau seiner Seiten, muss
+  `data/Adac.kt` angepasst werden. Für ganz neue Modelle gibt es oft noch keine Kostenrechnung.
 - Die Ortssuche für die deutsche Tankstelle nutzt den Geocoder des Geräts. Auf Geräten ohne Google-Dienste kann er leer
   bleiben; dann „In der Nähe“ nutzen.
 
@@ -119,6 +134,24 @@ Woche selbst abzulegen:
 
 `release.jks` niemals ins Repository einchecken (steht in `.gitignore`).
 
+## Auf GitHub veröffentlichen
+
+1. Auf github.com ein neues, leeres Repository anlegen (ohne README, ohne Lizenz).
+2. Dieses Projekt hochladen:
+   ```
+   git remote add origin https://github.com/<nutzer>/grenztanken.git
+   git push -u origin main
+   ```
+3. Signaturschlüssel anlegen und als Secrets eintragen (Abschnitt „Signierte Release-Version“).
+4. Version veröffentlichen: `versionName`/`versionCode` in `app/build.gradle.kts` erhöhen, dann
+   ```
+   git tag v0.5.0
+   git push origin v0.5.0
+   ```
+   Der Workflow **Release** baut die signierte APK und hängt sie an ein GitHub-Release. Andere laden
+   sie dort unter *Releases* herunter und installieren sie (Installation aus unbekannten Quellen
+   erlauben). Updates installieren sich nur über eine Version mit demselben Schlüssel.
+
 ## Veröffentlichen
 
 - **Namensnennung EU-Werte:** „Daten: fuel-prices.eu, CC BY 4.0“ (Quelle: EU Weekly Oil Bulletin)
@@ -129,6 +162,10 @@ Woche selbst abzulegen:
   seinen eigenen ein. Abfragen nur auf Nutzeraktion, keine Hintergrundabfragen.
 - **Play Store:** aktuelle Anforderungen in der Play Console prüfen (Ziel-API-Level,
   Datenschutzerklärung – die App fragt optional den ungefähren Standort ab).
+- **ADAC:** Quelle „ADAC Autokatalog“ steht in der App. Die Daten werden nicht gespeichert oder
+  weiterverteilt, nur pro Nutzer und Auswahl abgerufen.
+- **Schrift:** Inter, SIL Open Font License 1.1; Lizenztext liegt in der App unter
+  `assets/licenses/Inter-OFL.txt`.
 - App-Name und Paketname (`de.grenztanken.app`) vor der ersten Veröffentlichung festlegen;
   der Paketname lässt sich danach im Play Store nicht mehr ändern.
 
@@ -143,11 +180,13 @@ app/src/main/java/de/grenztanken/app/
   data/Repo.kt           lokale Speicherung (DataStore)
   data/Geo.kt            Ortssuche, Standort
   data/Osm.kt            Tankstellensuche CZ/PL (Nominatim), Strecke (OSRM) (Parser getestet)
+  data/Adac.kt           ADAC-Autokatalog: Marken, Modelle, Varianten, Kosten (Parser getestet)
   logic/Calc.kt          Rechnung (getestet)
   logic/PriceResolver.kt Preisquelle wählen, Morgen-Hinweis (getestet)
   logic/Stats.kt         Umgebung, mitgeschriebener Verlauf, zeitgewichteter Ø (getestet)
   Config.kt              optionale Relay-Adresse für EU-Werte
-  ui/                    Compose-Oberfläche (Theme.kt: eigenes Farbschema hell/dunkel,
-                         Components.kt: gemeinsame Bausteine wie Zapfsäulen-Preis)
-app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser und OSM-Suche
+  ui/                    Compose-Oberfläche (Theme.kt: Farbschema hell/dunkel und Schrift Inter,
+                         Components.kt: gemeinsame Bausteine wie Zapfsäulen-Preis, Hero-Karte,
+                         gruppierte Listen; AdacScreen.kt: Auswahl im ADAC-Katalog)
+app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser, OSM-Suche und ADAC-Katalog
 ```

@@ -3,6 +3,7 @@ package de.grenztanken.app
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.grenztanken.app.data.Adac
 import de.grenztanken.app.data.Geo
 import de.grenztanken.app.data.Osm
 import de.grenztanken.app.data.Repo
@@ -11,6 +12,7 @@ import de.grenztanken.app.data.Tankerkoenig
 import de.grenztanken.app.data.errorText
 import de.grenztanken.app.logic.PriceResolver
 import de.grenztanken.app.logic.Stats
+import de.grenztanken.app.model.AdacCost
 import de.grenztanken.app.model.Area
 import de.grenztanken.app.model.AreaStation
 import de.grenztanken.app.model.Country
@@ -50,6 +52,33 @@ data class OsmSearchState(
     val truncated: Boolean = false,
 )
 
+enum class AdacStep { BRAND, MODEL, GENERATION, VARIANT, COSTS }
+
+/** Schrittweise Auswahl im ADAC-Autokatalog: Marke → Modell → Generation → Variante → Kosten. */
+data class AdacState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val brands: List<Adac.Entry> = emptyList(),
+    val brand: Adac.Entry? = null,
+    val models: List<Adac.Entry> = emptyList(),
+    val model: Adac.Entry? = null,
+    val generations: List<Adac.Generation> = emptyList(),
+    val generation: Adac.Generation? = null,
+    val variants: List<Adac.Variant> = emptyList(),
+    val variant: Adac.Variant? = null,
+    /** null bei gewählter Variante: Der ADAC hat (noch) keine Kostenrechnung dafür. */
+    val costs: Adac.Costs? = null,
+) {
+    val step: AdacStep
+        get() = when {
+            variant != null -> AdacStep.COSTS
+            generation != null -> AdacStep.VARIANT
+            model != null -> AdacStep.GENERATION
+            brand != null -> AdacStep.MODEL
+            else -> AdacStep.BRAND
+        }
+}
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repo(app)
 
@@ -66,6 +95,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _osmSearch = MutableStateFlow(OsmSearchState())
     val osmSearch: StateFlow<OsmSearchState> = _osmSearch.asStateFlow()
     private var osmJob: Job? = null
+
+    private val _adac = MutableStateFlow(AdacState())
+    val adac: StateFlow<AdacState> = _adac.asStateFlow()
+    private var adacJob: Job? = null
 
     private var refreshJob: Job? = null
     private val loadLock = Mutex()
@@ -334,6 +367,90 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 OsmSearchState(error = errorText(e))
+            }
+        }
+    }
+
+    // ---- Autokosten aus dem ADAC-Autokatalog ----
+
+    fun adacOpen() {
+        val a = _adac.value
+        if (a.step == AdacStep.BRAND && a.brands.isEmpty() && !a.loading) adacRetry()
+    }
+
+    fun adacPickBrand(brand: Adac.Entry) = adacLoad(AdacState(brands = _adac.value.brands, brand = brand)) {
+        it.copy(models = Adac.models(brand.slug))
+    }
+
+    fun adacPickModel(model: Adac.Entry) = adacLoad(_adac.value.copy(model = model, generation = null, variant = null)) {
+        val gens = Adac.generations(it.brand!!.slug, model.slug)
+        // Nur eine Generation: direkt die Varianten zeigen.
+        if (gens.size == 1) {
+            it.copy(generations = gens, generation = gens[0], variants = Adac.variants(it.brand.slug, model.slug, gens[0].slug))
+        } else {
+            it.copy(generations = gens)
+        }
+    }
+
+    fun adacPickGeneration(gen: Adac.Generation) = adacLoad(_adac.value.copy(generation = gen, variant = null)) {
+        it.copy(variants = Adac.variants(it.brand!!.slug, it.model!!.slug, gen.slug))
+    }
+
+    fun adacPickVariant(v: Adac.Variant) = adacLoad(_adac.value.copy(variant = v, costs = null)) {
+        it.copy(costs = Adac.costs(it.brand!!.slug, it.model!!.slug, it.generation!!.slug, v.id))
+    }
+
+    /** Einen Schritt zurück; false, wenn schon bei der Markenauswahl. */
+    fun adacBack(): Boolean {
+        adacJob?.cancel()
+        val a = _adac.value.copy(loading = false, error = null)
+        _adac.value = when (a.step) {
+            AdacStep.BRAND -> return false
+            AdacStep.MODEL -> a.copy(brand = null, models = emptyList())
+            AdacStep.GENERATION -> a.copy(model = null, generations = emptyList())
+            // Gab es nur eine Generation, geht es direkt zurück zur Modellauswahl.
+            AdacStep.VARIANT -> if (a.generations.size <= 1) {
+                a.copy(model = null, generation = null, generations = emptyList(), variants = emptyList())
+            } else {
+                a.copy(generation = null, variants = emptyList())
+            }
+            AdacStep.COSTS -> a.copy(variant = null, costs = null)
+        }
+        return true
+    }
+
+    fun adacRetry() {
+        val a = _adac.value
+        when (a.step) {
+            AdacStep.BRAND -> adacLoad(a) { it.copy(brands = Adac.brands()) }
+            AdacStep.MODEL -> adacPickBrand(a.brand!!)
+            AdacStep.GENERATION -> adacPickModel(a.model!!)
+            AdacStep.VARIANT -> adacPickGeneration(a.generation!!)
+            AdacStep.COSTS -> adacPickVariant(a.variant!!)
+        }
+    }
+
+    /** Übernimmt die ADAC-Kosten der gewählten Variante; optional auch den ADAC-Verbrauch. */
+    fun adacApply(cost: AdacCost, takeConsumption: Boolean) {
+        val consumption = _adac.value.costs?.consumption
+        updateSettings { s ->
+            s.copy(
+                adacCost = cost,
+                consumption = consumption?.takeIf { takeConsumption && it < 50.0 } ?: s.consumption,
+            )
+        }
+    }
+
+    private fun adacLoad(start: AdacState, load: suspend (AdacState) -> AdacState) {
+        adacJob?.cancel()
+        _adac.value = start.copy(loading = true, error = null)
+        adacJob = viewModelScope.launch {
+            _adac.value = try {
+                load(_adac.value).copy(loading = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _adac.value.copy(loading = false, error = errorText(e))
             }
         }
     }

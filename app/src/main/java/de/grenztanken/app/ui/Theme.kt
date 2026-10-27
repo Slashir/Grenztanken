@@ -12,10 +12,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.grenztanken.app.R
 
 /*
  * Eigenes, festes Farbschema (keine dynamischen Systemfarben): Petrol als Hauptfarbe,
@@ -114,24 +119,64 @@ private val DarkResult = ResultColors(
 
 val LocalResultColors = staticCompositionLocalOf { LightResult }
 
+/** Farbverlauf für hervorgehobene Karten (deutsche Tankstelle, ADAC-Ergebnis). */
+@Immutable
+data class HeroColors(val start: Color, val end: Color, val content: Color, val muted: Color)
+
+private val LightHero = HeroColors(Color(0xFF0E5A60), Color(0xFF083B40), Color.White, Color(0xFFB9DADC))
+private val DarkHero = HeroColors(Color(0xFF145E64), Color(0xFF0A3236), Color(0xFFE6F4F4), Color(0xFF9CC4C6))
+
+val LocalHeroColors = staticCompositionLocalOf { LightHero }
+
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
     small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(26.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )
+
+/*
+ * Schrift: Inter (SIL Open Font License, Lizenz unter assets/licenses/Inter-OFL.txt) als variable Schrift.
+ * Große Größen nutzen die Display-Optik (opsz 32) mit engerer Laufweite.
+ */
+@OptIn(ExperimentalTextApi::class)
+private fun inter(weight: Int, opticalSize: Float) = Font(
+    R.font.inter,
+    FontWeight(weight),
+    variationSettings = FontVariation.Settings(
+        FontVariation.weight(weight),
+        FontVariation.Setting("opsz", opticalSize),
+    ),
+)
+
+private val InterText = FontFamily(listOf(400, 500, 600, 700).map { inter(it, 14f) })
+private val InterDisplay = FontFamily(listOf(400, 500, 600, 700, 800).map { inter(it, 32f) })
 
 private val Base = Typography()
 
-private val AppTypography = Base.copy(
-    headlineLarge = Base.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
-    headlineMedium = Base.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
-    titleLarge = Base.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-    titleMedium = Base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-    titleSmall = Base.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-    labelLarge = Base.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-    labelMedium = Base.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp),
+private fun TextStyle.display(weight: FontWeight, tracking: Double) =
+    copy(fontFamily = InterDisplay, fontWeight = weight, letterSpacing = tracking.sp)
+
+private fun TextStyle.text(weight: FontWeight? = null) =
+    copy(fontFamily = InterText, fontWeight = weight ?: fontWeight)
+
+private val AppTypography = Typography(
+    displayLarge = Base.displayLarge.display(FontWeight.Bold, -1.5),
+    displayMedium = Base.displayMedium.display(FontWeight.Bold, -1.0),
+    displaySmall = Base.displaySmall.display(FontWeight.Bold, -0.8),
+    headlineLarge = Base.headlineLarge.display(FontWeight.Bold, -0.8),
+    headlineMedium = Base.headlineMedium.display(FontWeight.Bold, -0.6),
+    headlineSmall = Base.headlineSmall.display(FontWeight.Bold, -0.4),
+    titleLarge = Base.titleLarge.display(FontWeight.SemiBold, -0.3),
+    titleMedium = Base.titleMedium.text(FontWeight.SemiBold),
+    titleSmall = Base.titleSmall.text(FontWeight.SemiBold),
+    bodyLarge = Base.bodyLarge.text(),
+    bodyMedium = Base.bodyMedium.text(),
+    bodySmall = Base.bodySmall.text(),
+    labelLarge = Base.labelLarge.text(FontWeight.SemiBold),
+    labelMedium = Base.labelMedium.text(FontWeight.SemiBold).copy(letterSpacing = 0.6.sp),
+    labelSmall = Base.labelSmall.text(FontWeight.Medium),
 )
 
 /** Zahlen mit gleich breiten Ziffern (Preise springen beim Aktualisieren nicht). */
@@ -140,7 +185,10 @@ val Tabular: TextStyle = TextStyle(fontFeatureSettings = "tnum")
 @Composable
 fun GrenztankenTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
-    CompositionLocalProvider(LocalResultColors provides if (dark) DarkResult else LightResult) {
+    CompositionLocalProvider(
+        LocalResultColors provides if (dark) DarkResult else LightResult,
+        LocalHeroColors provides if (dark) DarkHero else LightHero,
+    ) {
         MaterialTheme(
             colorScheme = if (dark) DarkColors else LightColors,
             typography = AppTypography,

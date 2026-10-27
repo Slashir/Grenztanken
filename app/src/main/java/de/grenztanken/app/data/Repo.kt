@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import de.grenztanken.app.model.AdacCost
+import de.grenztanken.app.model.AdacPoint
 import de.grenztanken.app.model.Area
 import de.grenztanken.app.model.AreaStation
 import de.grenztanken.app.model.CapPeriod
@@ -63,7 +65,30 @@ object JsonCodec {
         put("fuel", s.fuel.name)
         put("consumption", s.consumption)
         put("liters", s.liters)
-        put("wearCentPerKm", s.wearCentPerKm)
+        put("wearCentPerKm", s.manualWearCentPerKm)
+        put("kmPerYear", s.kmPerYear)
+        s.adacCost?.let {
+            put(
+                "adacCost",
+                JSONObject()
+                    .put("car", it.car)
+                    .put("url", it.url)
+                    .put("months", it.months)
+                    .put("withDeterioration", it.withDeterioration)
+                    .put(
+                        "points",
+                        JSONArray(
+                            it.points.map { p ->
+                                JSONObject()
+                                    .put("months", p.months)
+                                    .put("km", p.kmPerYear)
+                                    .put("workshop", p.workshop)
+                                    .put("deterioration", p.deterioration)
+                            },
+                        ),
+                    ),
+            )
+        }
         s.german?.let {
             put(
                 "german",
@@ -118,7 +143,23 @@ object JsonCodec {
             fuel = runCatching { Fuel.valueOf(o.optString("fuel")) }.getOrDefault(Fuel.E10),
             consumption = o.optDouble("consumption", 7.0),
             liters = o.optDouble("liters", 50.0),
-            wearCentPerKm = o.optDouble("wearCentPerKm", 0.0),
+            manualWearCentPerKm = o.optDouble("wearCentPerKm", 0.0),
+            kmPerYear = o.optInt("kmPerYear", 15_000).takeIf { it > 0 } ?: 15_000,
+            adacCost = o.optJSONObject("adacCost")?.let {
+                runCatching {
+                    val a = it.getJSONArray("points")
+                    AdacCost(
+                        car = it.getString("car"),
+                        url = it.optString("url"),
+                        points = (0 until a.length()).map { i ->
+                            val p = a.getJSONObject(i)
+                            AdacPoint(p.getInt("months"), p.getInt("km"), p.getDouble("workshop"), p.optDouble("deterioration", 0.0))
+                        },
+                        months = it.optInt("months", AdacCost.DEFAULT_MONTHS),
+                        withDeterioration = it.optBoolean("withDeterioration", false),
+                    )
+                }.getOrNull()?.takeIf { c -> c.points.isNotEmpty() }
+            },
             german = o.optJSONObject("german")?.let {
                 GermanStation(it.getString("id"), it.optString("name"), it.optString("address"), it.dbl("lat"), it.dbl("lng"))
             },

@@ -22,14 +22,12 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.11.1
 
       - name: Unit-Tests
-        run: gradle testDebugUnitTest --no-daemon
+        run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Debug-APK bauen
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
@@ -46,7 +44,7 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           export SIGNING_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
-          gradle assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         if: env.HAS_KEYSTORE == 'true'

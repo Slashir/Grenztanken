@@ -34,13 +34,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -116,16 +117,18 @@ fun HomeScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = market.loading,
+            onRefresh = onRefresh,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+        ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (market.loading) {
-                item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
-            }
             if (market.errors.isNotEmpty()) {
                 item { ErrorCard(market.errors) }
             }
@@ -145,6 +148,7 @@ fun HomeScreen(
                 ForeignCard(station, settings, market, onClick = { editing = station })
             }
             item { SourcesFooter() }
+        }
         }
     }
 
@@ -180,33 +184,33 @@ private fun GermanCard(station: GermanStation, s: Settings, m: Market) {
     val price = de?.priceFor(s.fuel)
     val r = LocalResultColors.current
 
-    AppCard {
+    HeroCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("🇩🇪  Deine Tankstelle", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            SectionLabel("🇩🇪  Deine Tankstelle", color = mutedColor(), modifier = Modifier.weight(1f))
             de?.let {
                 val open = it.status == "open"
                 Tag(
                     Fmt.status(it.status),
-                    if (open) r.goodContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    if (open) r.onGoodContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (open) r.goodContainer else LocalContentColor.current.copy(alpha = 0.16f),
+                    if (open) r.onGoodContainer else LocalContentColor.current,
                 )
             }
         }
         Text(station.name, style = MaterialTheme.typography.titleMedium)
-        Text(station.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(station.address, style = MaterialTheme.typography.bodySmall, color = mutedColor())
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             if (price != null) {
-                PumpPrice(price, MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold))
+                PumpPrice(price, MaterialTheme.typography.displayMedium)
             } else {
-                Text("–", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                Text("–", style = MaterialTheme.typography.displayMedium)
             }
             Spacer(Modifier.weight(1f))
-            Text(
+            Tag(
                 s.fuel.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
+                LocalContentColor.current.copy(alpha = 0.16f),
+                LocalContentColor.current,
+                modifier = Modifier.padding(bottom = 12.dp),
             )
         }
         de?.let {
@@ -214,7 +218,7 @@ private fun GermanCard(station: GermanStation, s: Settings, m: Market) {
                 if (it.isStale) "Letzter Preis vom ${Fmt.time(it.pricedAt)} · abgerufen ${Fmt.time(it.fetchedAt)}"
                 else "Stand ${Fmt.time(it.fetchedAt)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedColor(),
             )
         }
         if (price != null) {
@@ -233,7 +237,7 @@ private fun ComparisonBlock(price: Double, station: GermanStation, s: Settings, 
     val week = Stats.timeWeighted(history, s.fuel, now - 7L * 24 * 3_600_000L, now + 1)
     if (area == null && today == null && week == null) return
 
-    HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    HorizontalDivider(Modifier.padding(vertical = 10.dp), color = LocalContentColor.current.copy(alpha = 0.2f))
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         area?.let {
             CompareRow(
@@ -246,7 +250,7 @@ private fun ComparisonBlock(price: Double, station: GermanStation, s: Settings, 
                 "Günstigste: ${it.cheapest.name} ${Fmt.eurPerL(it.cheapestPrice)}" +
                     (it.cheapest.distKm?.let { d -> " · ${Fmt.dec(d, 1)} km" } ?: ""),
                 style = MaterialTheme.typography.bodySmall.merge(Tabular),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedColor(),
             )
         }
         today?.let {
@@ -272,7 +276,7 @@ private fun ComparisonBlock(price: Double, station: GermanStation, s: Settings, 
             Text(
                 "Ø heute / 7 Tage stammen aus deinen eigenen Abrufen und sind umso genauer, je öfter du die App öffnest.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedColor(),
             )
         }
     }
@@ -287,7 +291,7 @@ private fun CompareRow(title: String, detail: String, average: Double, own: Doub
                 Spacer(Modifier.size(8.dp))
                 Text(Fmt.eurPerL(average), style = MaterialTheme.typography.bodyMedium.merge(Tabular))
             }
-            Text(detail, style = MaterialTheme.typography.bodySmall.merge(Tabular), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(detail, style = MaterialTheme.typography.bodySmall.merge(Tabular), color = mutedColor())
         }
         DeltaTag(own, average)
     }

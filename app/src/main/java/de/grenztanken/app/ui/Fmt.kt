@@ -16,6 +16,7 @@ object Fmt {
     fun eurSigned(v: Double): String = (if (v > 0) "+" else "") + eur(v)
     fun eurPerL(v: Double): String = String.format(L, "%.3f €/l", v)
     fun ctPerL(v: Double): String = minus(String.format(L, "%+.1f ct/l", v * 100.0))
+    fun int(v: Int): String = String.format(L, "%,d", v)
     fun km(v: Double): String = String.format(L, "%.0f km", v)
     fun local(v: Double, c: Country): String = String.format(L, "%.2f %s/l", v, c.currencySymbol)
     fun localDiff(v: Double, c: Country): String = minus(String.format(L, "%+.2f %s/l", v, c.currencySymbol))
