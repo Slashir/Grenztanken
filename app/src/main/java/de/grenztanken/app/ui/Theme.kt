@@ -23,8 +23,9 @@ import androidx.compose.ui.unit.sp
 import de.grenztanken.app.R
 
 /*
- * Eigenes, festes Farbschema (keine dynamischen Systemfarben): Petrol als Hauptfarbe,
- * Bernstein als Akzent (Zapfsäulen-Anzeige), Grün/Rot ausschließlich für Ergebnis-Aussagen.
+ * Eigenes, festes Farbschema (keine dynamischen Systemfarben). Jede Farbe hat genau eine Rolle:
+ * Petrol = Marke, Text, Auswahl; Bernstein (secondary) = die eine Hauptaktion eines Bildschirms;
+ * Grün/Rot = ausschließlich Ergebnis-Aussagen; alles andere neutral grau.
  */
 
 private val Petrol = Color(0xFF0E5A60)
@@ -39,8 +40,8 @@ private val LightColors = lightColorScheme(
     onPrimaryContainer = Color(0xFF002022),
     secondary = Amber,
     onSecondary = Color(0xFF2A1800),
-    secondaryContainer = Color(0xFFFFE3B8),
-    onSecondaryContainer = Color(0xFF2A1800),
+    secondaryContainer = Color(0xFFE2E8E8),
+    onSecondaryContainer = Color(0xFF161D1E),
     background = Color(0xFFF3F5F5),
     onBackground = Color(0xFF161D1E),
     surface = Color(0xFFF3F5F5),
@@ -67,8 +68,8 @@ private val DarkColors = darkColorScheme(
     onPrimaryContainer = Color(0xFFCDEBEC),
     secondary = AmberLight,
     onSecondary = Color(0xFF3A2500),
-    secondaryContainer = Color(0xFF5A3C00),
-    onSecondaryContainer = Color(0xFFFFE3B8),
+    secondaryContainer = Color(0xFF2A3335),
+    onSecondaryContainer = Color(0xFFDDE4E4),
     background = Color(0xFF0F1415),
     onBackground = Color(0xFFDDE4E4),
     surface = Color(0xFF0F1415),
@@ -77,14 +78,14 @@ private val DarkColors = darkColorScheme(
     onSurfaceVariant = Color(0xFFA3B0B2),
     surfaceContainerLowest = Color(0xFF0A0F10),
     surfaceContainerLow = Color(0xFF151C1D),
-    surfaceContainer = Color(0xFF192123),
-    surfaceContainerHigh = Color(0xFF212A2C),
-    surfaceContainerHighest = Color(0xFF2A3436),
+    surfaceContainer = Color(0xFF1C2527),
+    surfaceContainerHigh = Color(0xFF242E30),
+    surfaceContainerHighest = Color(0xFF2C3739),
     outline = Color(0xFF4D5A5C),
     outlineVariant = Color(0xFF2C3638),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
-    errorContainer = Color(0xFF5C1A15),
+    errorContainer = Color(0xFF3B1512),
     onErrorContainer = Color(0xFFFFDAD6),
 )
 
@@ -119,20 +120,20 @@ private val DarkResult = ResultColors(
 
 val LocalResultColors = staticCompositionLocalOf { LightResult }
 
-/** Farbverlauf für hervorgehobene Karten (deutsche Tankstelle, ADAC-Ergebnis). */
+/** Hervorgehobene Ergebnis-Fläche (ADAC-Ergebnis): eine pro Bildschirm. */
 @Immutable
-data class HeroColors(val start: Color, val end: Color, val content: Color, val muted: Color)
+data class HeroColors(val container: Color, val content: Color, val muted: Color)
 
-private val LightHero = HeroColors(Color(0xFF0E5A60), Color(0xFF083B40), Color.White, Color(0xFFB9DADC))
-private val DarkHero = HeroColors(Color(0xFF145E64), Color(0xFF0A3236), Color(0xFFE6F4F4), Color(0xFF9CC4C6))
+private val LightHero = HeroColors(Color(0xFF0E5A60), Color.White, Color(0xFFD3E8E9))
+private val DarkHero = HeroColors(Color(0xFF145E64), Color(0xFFE6F4F4), Color(0xFFC2DDDF))
 
 val LocalHeroColors = staticCompositionLocalOf { LightHero }
 
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
     small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(26.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
     extraLarge = RoundedCornerShape(32.dp),
 )
 

@@ -122,7 +122,7 @@ fun ForeignDialog(
                             selected = country == c,
                             onClick = { country = c },
                             shape = SegmentedButtonDefaults.itemShape(index, Country.entries.size),
-                        ) { Text("${c.flag} ${c.label}") }
+                        ) { Text(c.label) }
                     }
                 }
                 OutlinedTextField(
@@ -296,7 +296,7 @@ private fun OsmSearchDialog(
                             Column(Modifier.padding(10.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        "${st.country.flag} ${st.name}",
+                                        "${st.country.code} · ${st.name}",
                                         style = MaterialTheme.typography.titleSmall,
                                         modifier = Modifier.weight(1f),
                                     )

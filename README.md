@@ -3,6 +3,12 @@
 Android-App (Kotlin, Jetpack Compose): Lohnt sich das Tanken in Tschechien oder Polen gegenüber
 deiner deutschen Stammtankstelle – und bis zu welcher Entfernung?
 
+> **Vor dem ersten Start: eigenen API-Schlüssel bei Tankerkönig beantragen.**
+> Für die Preise in Deutschland braucht jeder Nutzer einen eigenen, persönlichen Schlüssel von
+> Tankerkönig. Er ist **kostenlos** und schnell beantragt: <https://onboarding.tankerkoenig.de/>.
+> Den Schlüssel in der App unter *Einstellungen → Tankerkönig-Schlüssel* eintragen. Er bleibt auf dem
+> Gerät und wird nur an Tankerkönig gesendet. Schlüssel nicht weitergeben und nicht veröffentlichen.
+
 ## Was die App zeigt
 
 - **Deutschland:** aktueller Preis deiner gewählten Tankstelle (E5, E10 oder Diesel) über die
@@ -186,7 +192,7 @@ app/src/main/java/de/grenztanken/app/
   logic/Stats.kt         Umgebung, mitgeschriebener Verlauf, zeitgewichteter Ø (getestet)
   Config.kt              optionale Relay-Adresse für EU-Werte
   ui/                    Compose-Oberfläche (Theme.kt: Farbschema hell/dunkel und Schrift Inter,
-                         Components.kt: gemeinsame Bausteine wie Zapfsäulen-Preis, Hero-Karte,
-                         gruppierte Listen; AdacScreen.kt: Auswahl im ADAC-Katalog)
+                         Components.kt: gemeinsame Bausteine wie Zapfsäulen-Preis, Ergebnis-Karte,
+                         gruppierte Listen, Quellen-Dialog; AdacScreen.kt: Auswahl im ADAC-Katalog)
 app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser, OSM-Suche und ADAC-Katalog
 ```

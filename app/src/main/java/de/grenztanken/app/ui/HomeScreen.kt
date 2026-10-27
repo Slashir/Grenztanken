@@ -1,58 +1,62 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package de.grenztanken.app.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import de.grenztanken.app.OsmSearchState
 import de.grenztanken.app.logic.Calc
@@ -89,12 +93,15 @@ fun HomeScreen(
 ) {
     var editing by remember { mutableStateOf<ForeignStation?>(null) }
     var creating by remember { mutableStateOf(false) }
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showSources by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(market.loading, market.errors.size) {
+        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+    }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text("Grenztanken") },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !market.loading) {
@@ -104,16 +111,7 @@ fun HomeScreen(
                         Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
                     }
                 },
-                scrollBehavior = scroll,
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                text = { Text("Tankstelle") },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                onClick = { creating = true },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -124,31 +122,38 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (market.errors.isNotEmpty()) {
-                item { ErrorCard(market.errors) }
+            // Beste Tankstelle zuerst; ohne Ergebnis ans Ende.
+            val today = LocalDate.now(BERLIN)
+            val entries = settings.foreign
+                .map { it to evaluate(it, settings, market, today) }
+                .sortedByDescending { (_, e) -> (e as? Evaluation.Ready)?.calc?.netSaving ?: Double.NEGATIVE_INFINITY }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (market.errors.isNotEmpty()) {
+                    item { ErrorCard(market.errors) }
+                }
+                if (settings.apiKey.isBlank() || settings.german == null) {
+                    item { SetupCard(onOpenSettings) }
+                }
+                if (entries.isEmpty()) {
+                    item { HintCard() }
+                }
+                items(entries, key = { it.first.id }) { (station, evaluation) ->
+                    ForeignCard(station, evaluation, settings, onEdit = { editing = station })
+                }
+                item { AddCard(onClick = { creating = true }) }
+                settings.german?.let { german ->
+                    item { SectionLabel("Deine Tankstelle", Modifier.padding(start = 4.dp, top = 12.dp)) }
+                    item { GermanCard(german, settings, market) }
+                }
+                item { SettingsRow(settings, onOpenSettings) }
+                item { Footer(onSources = { showSources = true }) }
             }
-            if (settings.apiKey.isBlank() || settings.german == null) {
-                item { SetupCard(onOpenSettings) }
-            }
-            settings.german?.let { german ->
-                item { GermanCard(german, settings, market) }
-            }
-            item { SettingsChips(settings, onOpenSettings) }
-            if (settings.foreign.isEmpty()) {
-                item { HintCard() }
-            } else {
-                item { SectionLabel("Im Ausland tanken", Modifier.padding(start = 4.dp, top = 8.dp)) }
-            }
-            items(settings.foreign, key = { it.id }) { station ->
-                ForeignCard(station, settings, market, onClick = { editing = station })
-            }
-            item { SourcesFooter() }
-        }
         }
     }
 
@@ -174,224 +179,252 @@ fun HomeScreen(
             },
         )
     }
-}
-
-// ---------------------------------------------------------------- Deutsche Tankstelle
-
-@Composable
-private fun GermanCard(station: GermanStation, s: Settings, m: Market) {
-    val de: DePrice? = m.de?.takeIf { it.stationId == station.id }
-    val price = de?.priceFor(s.fuel)
-    val r = LocalResultColors.current
-
-    HeroCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("🇩🇪  Deine Tankstelle", color = mutedColor(), modifier = Modifier.weight(1f))
-            de?.let {
-                val open = it.status == "open"
-                Tag(
-                    Fmt.status(it.status),
-                    if (open) r.goodContainer else LocalContentColor.current.copy(alpha = 0.16f),
-                    if (open) r.onGoodContainer else LocalContentColor.current,
-                )
-            }
-        }
-        Text(station.name, style = MaterialTheme.typography.titleMedium)
-        Text(station.address, style = MaterialTheme.typography.bodySmall, color = mutedColor())
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            if (price != null) {
-                PumpPrice(price, MaterialTheme.typography.displayMedium)
-            } else {
-                Text("–", style = MaterialTheme.typography.displayMedium)
-            }
-            Spacer(Modifier.weight(1f))
-            Tag(
-                s.fuel.label,
-                LocalContentColor.current.copy(alpha = 0.16f),
-                LocalContentColor.current,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
-        }
-        de?.let {
-            Text(
-                if (it.isStale) "Letzter Preis vom ${Fmt.time(it.pricedAt)} · abgerufen ${Fmt.time(it.fetchedAt)}"
-                else "Stand ${Fmt.time(it.fetchedAt)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = mutedColor(),
-            )
-        }
-        if (price != null) {
-            ComparisonBlock(price, station, s, m)
-        }
-    }
-}
-
-@Composable
-private fun ComparisonBlock(price: Double, station: GermanStation, s: Settings, m: Market) {
-    val area = m.area?.takeIf { it.stationId == station.id }?.let { Stats.area(it, s.fuel) }
-    val history = if (m.historyStationId == station.id) m.history else emptyList()
-    val now = System.currentTimeMillis()
-    val dayStart = LocalDate.now(BERLIN).atStartOfDay(BERLIN).toInstant().toEpochMilli()
-    val today = Stats.timeWeighted(history, s.fuel, dayStart, now + 1)
-    val week = Stats.timeWeighted(history, s.fuel, now - 7L * 24 * 3_600_000L, now + 1)
-    if (area == null && today == null && week == null) return
-
-    HorizontalDivider(Modifier.padding(vertical = 10.dp), color = LocalContentColor.current.copy(alpha = 0.2f))
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        area?.let {
-            CompareRow(
-                title = "Umgebung jetzt",
-                detail = "Ø von ${it.count} geöffneten im Umkreis ${Fmt.km(it.radiusKm)}",
-                average = it.average,
-                own = price,
-            )
-            Text(
-                "Günstigste: ${it.cheapest.name} ${Fmt.eurPerL(it.cheapestPrice)}" +
-                    (it.cheapest.distKm?.let { d -> " · ${Fmt.dec(d, 1)} km" } ?: ""),
-                style = MaterialTheme.typography.bodySmall.merge(Tabular),
-                color = mutedColor(),
-            )
-        }
-        today?.let {
-            CompareRow(
-                title = "Ø heute",
-                detail = "aus ${it.observations} ${if (it.observations == 1) "Abruf" else "Abrufen"} · " +
-                    "${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
-                average = it.average,
-                own = price,
-            )
-        }
-        week?.let {
-            if (it.observations > (today?.observations ?: 0)) {
-                CompareRow(
-                    title = "Ø 7 Tage",
-                    detail = "aus ${it.observations} Abrufen · ${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
-                    average = it.average,
-                    own = price,
-                )
-            }
-        }
-        if (today != null || week != null) {
-            Text(
-                "Ø heute / 7 Tage stammen aus deinen eigenen Abrufen und sind umso genauer, je öfter du die App öffnest.",
-                style = MaterialTheme.typography.bodySmall,
-                color = mutedColor(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompareRow(title: String, detail: String, average: Double, own: Double) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.size(8.dp))
-                Text(Fmt.eurPerL(average), style = MaterialTheme.typography.bodyMedium.merge(Tabular))
-            }
-            Text(detail, style = MaterialTheme.typography.bodySmall.merge(Tabular), color = mutedColor())
-        }
-        DeltaTag(own, average)
-    }
-}
-
-@Composable
-private fun SettingsChips(s: Settings, onOpenSettings: () -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(horizontal = 4.dp),
-    ) {
-        val c = MaterialTheme.colorScheme.secondaryContainer
-        val on = MaterialTheme.colorScheme.onSecondaryContainer
-        listOf(
-            s.fuel.label,
-            "${Fmt.dec(s.consumption, 1)} l/100 km",
-            "${Fmt.dec(s.liters, 0)} l tanken",
-            if (s.wearCentPerKm > 0.0) "Verschleiß ${Fmt.dec(s.wearCentPerKm, 1)} ct/km" else "ohne Verschleiß",
-        ).forEach { Tag(it, c, on) }
-        // Ohne onClick-Parameter, sonst erzwingt Material 48 dp Mindesthöhe und die Zeile verrutscht.
-        Surface(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .clickable(onClick = onOpenSettings),
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Text(
-                "Ändern",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            )
-        }
-    }
+    if (showSources) SourcesDialog(onDismiss = { showSources = false })
 }
 
 // ---------------------------------------------------------------- Ausland
 
-@Composable
-private fun ForeignCard(station: ForeignStation, s: Settings, m: Market, onClick: () -> Unit) {
-    val today = LocalDate.now(BERLIN)
+/** Was sich für eine Auslandstankstelle ausrechnen lässt. */
+private sealed interface Evaluation {
+    data class Ready(
+        val calc: Calculation,
+        val price: ForeignPrice,
+        val germanPrice: Double,
+        val rate: RateInfo?,
+        val tomorrow: TomorrowHint?,
+        val staleDeSince: Long?,
+    ) : Evaluation
+
+    data class Missing(val reason: String) : Evaluation
+}
+
+private fun evaluate(station: ForeignStation, s: Settings, m: Market, today: LocalDate): Evaluation {
     val price = PriceResolver.resolve(station, s.fuel, m, today)
-    val tomorrow = if (price?.source == PriceSource.CAP_TODAY) PriceResolver.tomorrow(station, s.fuel, m, today) else null
     val dePrice = m.de?.takeIf { it.stationId == s.german?.id }
     val de = dePrice?.priceFor(s.fuel)
-
-    AppCard(onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${station.country.flag}  ${station.name}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Icon(Icons.Filled.Edit, contentDescription = "Bearbeiten", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-        }
-        Text(
-            listOf(station.address, "${Fmt.km(station.oneWayKm)} einfach", station.country.label)
-                .filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    return when {
+        price == null -> Evaluation.Missing(
+            "Noch kein Preis für ${station.country.label}: kein gültiger Höchstpreis und noch kein EU-Durchschnitt " +
+                "geladen. Zum Aktualisieren herunterziehen oder den Preis von der Säule eintragen.",
         )
-        when {
-            price == null -> Notice(
-                "Noch kein Preis für ${station.country.label}: kein gültiger Höchstpreis und noch kein " +
-                    "EU-Durchschnitt geladen. Bitte oben aktualisieren oder die Karte antippen und den " +
-                    "Preis an der Säule eintragen.",
-            )
+        price.perEur == null -> Evaluation.Missing("Wechselkurs fehlt noch. Zum Aktualisieren herunterziehen.")
+        de == null && dePrice?.status == "closed" -> Evaluation.Missing(
+            "Deine deutsche Tankstelle hat gerade geschlossen, Tankerkönig liefert dann keinen Preis. Sobald sie " +
+                "geöffnet hat, aktualisieren; danach bleibt der letzte Preis auch nachts stehen.",
+        )
+        de == null -> Evaluation.Missing("Deutscher Preis fehlt. Prüfe in den Einstellungen Schlüssel und Tankstelle.")
+        else -> Evaluation.Ready(
+            calc = Calc.compute(
+                de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm,
+                wearEurPerKm = s.wearCentPerKm / 100.0,
+            ),
+            price = price,
+            germanPrice = de,
+            rate = m.rate(station.country),
+            tomorrow = if (price.source == PriceSource.CAP_TODAY) PriceResolver.tomorrow(station, s.fuel, m, today) else null,
+            staleDeSince = dePrice?.takeIf { it.isStale }?.pricedAt,
+        )
+    }
+}
 
-            price.perEur == null -> Notice("Wechselkurs fehlt noch. Bitte oben aktualisieren.")
+@Composable
+private fun ForeignCard(station: ForeignStation, evaluation: Evaluation, s: Settings, onEdit: () -> Unit) {
+    val r = LocalResultColors.current
+    val ready = evaluation as? Evaluation.Ready
+    val good = ready?.calc?.worthIt == true
+    var expanded by rememberSaveable(station.id) { mutableStateOf(false) }
 
-            de == null && dePrice?.status == "closed" -> Notice(
-                "Deine deutsche Tankstelle hat gerade geschlossen, und Tankerkönig liefert dann keinen " +
-                    "Preis. Sobald sie geöffnet hat, oben aktualisieren – danach bleibt der letzte Preis " +
-                    "auch nachts stehen.",
-            )
-
-            de == null -> Notice("Deutscher Preis fehlt. Prüfe in den Einstellungen Schlüssel und Tankstelle.")
-
-            else -> ResultBlock(
-                calc = Calc.compute(
-                    de, price.price, price.perEur, s.liters, s.consumption, station.oneWayKm,
-                    wearEurPerKm = s.wearCentPerKm / 100.0,
-                ),
-                price = price,
-                station = station,
-                s = s,
-                rate = m.rate(station.country),
-                tomorrow = tomorrow,
-                staleDeSince = dePrice?.takeIf { it.isStale }?.pricedAt,
-            )
-        }
-        if (station.lat != null && station.lng != null) {
-            val uri = LocalUriHandler.current
-            FilledTonalButton(
-                onClick = { uri.openUri(mapsRouteUrl(s.german, station.lat, station.lng)) },
-                modifier = Modifier.padding(top = 6.dp),
-            ) {
-                Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("  Route in Google Maps")
+    AppCard(
+        containerColor = when {
+            ready == null -> MaterialTheme.colorScheme.surfaceContainer
+            good -> r.goodContainer
+            else -> r.badContainer
+        },
+        contentColor = when {
+            ready == null -> MaterialTheme.colorScheme.onSurface
+            good -> r.onGoodContainer
+            else -> r.onBadContainer
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CountryBadge(station.country)
+            Spacer(Modifier.size(10.dp))
+            Text(station.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Filled.Edit, contentDescription = "Bearbeiten", modifier = Modifier.size(20.dp))
             }
         }
+        Text(
+            listOf(station.address, "${Fmt.km(station.oneWayKm)} einfach").filter { it.isNotBlank() }.joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall,
+            color = mutedColor(),
+        )
+
+        when (evaluation) {
+            is Evaluation.Missing -> Text(
+                evaluation.reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = mutedColor(),
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            is Evaluation.Ready -> {
+                val c = evaluation.calc
+                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
+                    Text(
+                        if (good) "Lohnt sich" else "Lohnt sich nicht",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(bottom = 4.dp),
+                    )
+                    Text(
+                        Fmt.eurSigned(c.netSaving),
+                        style = MaterialTheme.typography.displaySmall.merge(Tabular),
+                        color = if (good) r.good else r.bad,
+                    )
+                }
+                Text(summary(c), style = MaterialTheme.typography.bodyMedium.merge(Tabular))
+                Text(
+                    buildAnnotatedString {
+                        append(pumpText(c.foreignEurPerL))
+                        append(" dort · ")
+                        append(pumpText(evaluation.germanPrice))
+                        append(" hier · ")
+                        append(shortSource(evaluation.price))
+                    },
+                    style = MaterialTheme.typography.bodyMedium.merge(Tabular),
+                    color = mutedColor(),
+                )
+                evaluation.staleDeSince?.let {
+                    Text(
+                        "Deutscher Preis vom ${Fmt.time(it)}, die Tankstelle hat gerade geschlossen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = mutedColor(),
+                    )
+                }
+                evaluation.tomorrow?.let { TomorrowLine(it, station) }
+                AnimatedVisibility(visible = expanded) {
+                    CalcDetails(evaluation, station, s)
+                }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+            if (ready != null) {
+                ExpandButton(
+                    expanded = expanded,
+                    closedLabel = "Rechnung anzeigen",
+                    openLabel = "Rechnung ausblenden",
+                    onToggle = { expanded = !expanded },
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            if (station.lat != null && station.lng != null) {
+                val uri = LocalUriHandler.current
+                val content = LocalContentColor.current
+                FilledTonalButton(
+                    onClick = { uri.openUri(mapsRouteUrl(s.german, station.lat, station.lng)) },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = content.copy(alpha = 0.09f),
+                        contentColor = content,
+                    ),
+                ) {
+                    Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("  Route")
+                }
+            }
+        }
+    }
+}
+
+/** "Ersparnis 19,82 € − Fahrt 6,35 € · lohnt bis ca. 69 km einfach" */
+private fun summary(c: Calculation): String {
+    if (c.diffPerL <= 0.0) {
+        return "Dort ${Fmt.dec(-c.diffPerL * 100.0, 1)} ct/l teurer als hier · Fahrt ${Fmt.eur(c.tripCost)}"
+    }
+    val base = "Ersparnis ${Fmt.eur(c.grossSaving)} − Fahrt ${Fmt.eur(c.tripCost)}"
+    return c.breakEvenOneWayKm?.let { "$base · lohnt bis ca. ${Fmt.km(it)} einfach" } ?: base
+}
+
+private fun shortSource(p: ForeignPrice): String = when (p.source) {
+    PriceSource.MANUAL -> "dein Preis"
+    PriceSource.CAP_TODAY -> "Höchstpreis heute"
+    PriceSource.CAP_TOMORROW -> "Höchstpreis ab morgen"
+    PriceSource.EU_WEEKLY -> "Landesdurchschnitt"
+}
+
+private fun sourceLabel(p: ForeignPrice): String = when (p.source) {
+    PriceSource.MANUAL -> "Preis von dir eingetragen."
+    PriceSource.CAP_TODAY -> "Amtlicher Höchstpreis, gültig ${p.period?.let { Fmt.period(it) }.orEmpty()}."
+    PriceSource.CAP_TOMORROW ->
+        "Amtlicher Höchstpreis ab morgen (${p.period?.let { Fmt.period(it) }.orEmpty()}); " +
+            "der heutige Wert wurde nicht abgerufen."
+    PriceSource.EU_WEEKLY ->
+        "Richtwert: EU-Landesdurchschnitt, Woche vom ${p.euWeek?.let { Fmt.date(it) }.orEmpty()}. " +
+            "Grenztankstellen können abweichen."
+}
+
+@Composable
+private fun CalcDetails(e: Evaluation.Ready, station: ForeignStation, s: Settings) {
+    val c = e.calc
+    val r = LocalResultColors.current
+    val muted = mutedColor()
+    val isEu = e.price.source == PriceSource.EU_WEEKLY
+    Column(
+        Modifier
+            .padding(top = 10.dp)
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(LocalContentColor.current.copy(alpha = 0.06f))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ValueRow(
+            "Preis dort",
+            Fmt.eurPerL(c.foreignEurPerL) + if (isEu) "" else " = ${Fmt.local(e.price.price, station.country)}",
+            labelColor = muted,
+        )
+        ValueRow("Preis hier", Fmt.eurPerL(e.germanPrice), labelColor = muted)
+        ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(c.grossSaving), labelColor = muted)
+        ValueRow("Sprit hin und zurück, ${Fmt.km(2 * station.oneWayKm)}", Fmt.eur(-c.tripFuelCost), labelColor = muted)
+        if (c.wearPerKm > 0.0) {
+            ValueRow(
+                "Verschleiß, ${Fmt.km(2 * station.oneWayKm)} × ${Fmt.dec(c.wearPerKm * 100.0, 1)} ct",
+                Fmt.eur(-c.tripWearCost),
+                labelColor = muted,
+            )
+        }
+        HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.15f))
+        ValueRow("Unterm Strich", Fmt.eurSigned(c.netSaving), bold = true, color = if (c.worthIt) r.good else r.bad)
+        Text(
+            sourceLabel(e.price) + if (!isEu && e.rate != null) {
+                " Kurs 1 € = ${Fmt.dec(e.rate.perEur, 3)} ${station.country.currencySymbol} (${e.rate.date})."
+            } else {
+                ""
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = muted,
+        )
+    }
+}
+
+@Composable
+private fun TomorrowLine(t: TomorrowHint, station: ForeignStation) {
+    val text = when {
+        t.diff < -0.005 ->
+            "Morgen günstiger: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}). Wenn es nicht eilt, warten."
+        t.diff > 0.005 ->
+            "Morgen teurer: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}). Besser heute tanken."
+        else -> "Morgen gilt derselbe Höchstpreis."
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = LocalContentColor.current.copy(alpha = 0.08f),
+        contentColor = LocalContentColor.current,
+        modifier = Modifier.padding(top = 6.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp))
     }
 }
 
@@ -401,160 +434,214 @@ private fun mapsRouteUrl(german: GermanStation?, lat: Double, lng: Double): Stri
     return "https://www.google.com/maps/dir/?api=1$origin&destination=$lat,$lng&travelmode=driving"
 }
 
-private fun sourceLabel(p: ForeignPrice): String = when (p.source) {
-    PriceSource.MANUAL -> "Preis von dir eingetragen"
-    PriceSource.CAP_TODAY -> "Amtlicher Höchstpreis, gültig ${p.period?.let { Fmt.period(it) }.orEmpty()}"
-    PriceSource.CAP_TOMORROW ->
-        "Amtlicher Höchstpreis ab morgen (${p.period?.let { Fmt.period(it) }.orEmpty()}); " +
-            "der heutige Wert wurde nicht abgerufen"
-    PriceSource.EU_WEEKLY ->
-        "Richtwert: EU-Landesdurchschnitt, Woche vom ${p.euWeek?.let { Fmt.date(it) }.orEmpty()}. " +
-            "Grenztankstellen können abweichen."
+@Composable
+private fun AddCard(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(MaterialTheme.shapes.large)
+            .dashedBorder(MaterialTheme.colorScheme.outline, 24.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text(
+                "  Tankstelle im Ausland hinzufügen",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }
 
-@Composable
-private fun ResultBlock(
-    calc: Calculation,
-    price: ForeignPrice,
-    station: ForeignStation,
-    s: Settings,
-    rate: RateInfo?,
-    tomorrow: TomorrowHint?,
-    staleDeSince: Long?,
-) {
-    val r = LocalResultColors.current
-    val isEu = price.source == PriceSource.EU_WEEKLY
+// ---------------------------------------------------------------- Deutsche Tankstelle
 
-    // Ergebnis zuerst
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = if (calc.worthIt) r.goodContainer else r.badContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-    ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (calc.worthIt) "Lohnt sich" else "Lohnt sich nicht",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (calc.worthIt) r.onGoodContainer else r.onBadContainer,
+@Composable
+private fun GermanCard(station: GermanStation, s: Settings, m: Market) {
+    val de: DePrice? = m.de?.takeIf { it.stationId == station.id }
+    val price = de?.priceFor(s.fuel)
+    val r = LocalResultColors.current
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    val area = m.area?.takeIf { it.stationId == station.id }?.let { Stats.area(it, s.fuel) }
+    val history = if (m.historyStationId == station.id) m.history else emptyList()
+    val now = System.currentTimeMillis()
+    val dayStart = LocalDate.now(BERLIN).atStartOfDay(BERLIN).toInstant().toEpochMilli()
+    val today = Stats.timeWeighted(history, s.fuel, dayStart, now + 1)
+    val week = Stats.timeWeighted(history, s.fuel, now - 7L * 24 * 3_600_000L, now + 1)
+        ?.takeIf { it.observations > (today?.observations ?: 0) }
+
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(station.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            de?.let {
+                val color = if (it.status == "open") r.good else MaterialTheme.colorScheme.onSurfaceVariant
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(color),
                 )
-                Text(
-                    calc.breakEvenOneWayKm?.let { "bis ca. ${Fmt.km(it)} einfache Strecke" }
-                        ?: "Im Ausland gerade nicht günstiger",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (calc.worthIt) r.onGoodContainer else r.onBadContainer,
-                )
+                Text("  " + Fmt.status(it.status), style = MaterialTheme.typography.labelLarge, color = color)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (price != null) {
+                PumpPrice(price, MaterialTheme.typography.headlineLarge)
+            } else {
+                Text("–", style = MaterialTheme.typography.headlineLarge)
             }
             Text(
-                Fmt.eurSigned(calc.netSaving),
-                style = MaterialTheme.typography.headlineSmall.merge(Tabular),
-                fontWeight = FontWeight.Bold,
-                color = if (calc.worthIt) r.good else r.bad,
-            )
-        }
-    }
-
-    // Preis im Ausland
-    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
-        PumpPrice(calc.foreignEurPerL, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-        if (!isEu) {
-            Text(
-                "  = ${Fmt.local(price.price, station.country)}",
-                style = MaterialTheme.typography.bodyMedium.merge(Tabular),
+                "  " + s.fuel.label,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 3.dp),
+                modifier = Modifier.weight(1f),
             )
-        } else {
-            Text("  Ø Land", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+            val reference = area?.average ?: today?.average
+            if (price != null && reference != null) DeltaTag(price, reference)
+        }
+        val canExpand = price != null && (area != null || today != null || week != null)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                de?.let {
+                    buildString {
+                        append(if (it.isStale) "Letzter Preis vom ${Fmt.time(it.pricedAt)}" else "Stand ${Fmt.time(it.fetchedAt)}")
+                        area?.let { a -> append(" · Ø ${Fmt.km(a.radiusKm)}: ${Fmt.eurPerL(a.average)}") }
+                    }
+                }.orEmpty(),
+                style = MaterialTheme.typography.bodySmall.merge(Tabular),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (canExpand) {
+                ExpandButton(
+                    expanded = expanded,
+                    closedLabel = "Mehr",
+                    openLabel = "Weniger",
+                    onToggle = { expanded = !expanded },
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        if (price != null && canExpand) {
+            AnimatedVisibility(visible = expanded) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    area?.let {
+                        CompareRow(
+                            "Umgebung jetzt · ${Fmt.eurPerL(it.average)}",
+                            "Ø von ${it.count} geöffneten im Umkreis ${Fmt.km(it.radiusKm)}",
+                            it.average,
+                            price,
+                        )
+                    }
+                    today?.let {
+                        CompareRow(
+                            "Ø heute · ${Fmt.eurPerL(it.average)}",
+                            "aus ${it.observations} ${if (it.observations == 1) "Abruf" else "Abrufen"} · " +
+                                "${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
+                            it.average,
+                            price,
+                        )
+                    }
+                    week?.let {
+                        CompareRow(
+                            "Ø 7 Tage · ${Fmt.eurPerL(it.average)}",
+                            "aus ${it.observations} Abrufen · ${Fmt.eurPerL(it.min)} – ${Fmt.eurPerL(it.max)}",
+                            it.average,
+                            price,
+                        )
+                    }
+                    area?.let {
+                        Text(
+                            "Günstigste in der Nähe: ${it.cheapest.name} ${Fmt.eurPerL(it.cheapestPrice)}" +
+                                (it.cheapest.distKm?.let { d -> " · ${Fmt.dec(d, 1)} km" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall.merge(Tabular),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (today != null || week != null) {
+                        Text(
+                            "Ø heute und Ø 7 Tage stammen aus deinen eigenen Abrufen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
-    Text(sourceLabel(price), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    if (!isEu && rate != null) {
-        Text(
-            "Kurs: 1 € = ${Fmt.dec(rate.perEur, 3)} ${station.country.currencySymbol} (${rate.date})",
-            style = MaterialTheme.typography.bodySmall.merge(Tabular),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    tomorrow?.let { TomorrowLine(it, station) }
-    staleDeSince?.let {
-        Text(
-            "Verglichen mit dem letzten deutschen Preis vom ${Fmt.time(it)} (Tankstelle gerade geschlossen).",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-
-    // Rechnung
-    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    ValueRow("Preisunterschied", Fmt.ctPerL(calc.diffPerL), labelColor = muted)
-    ValueRow("Ersparnis bei ${Fmt.dec(s.liters, 0)} l", Fmt.eur(calc.grossSaving), labelColor = muted)
-    ValueRow("Sprit hin und zurück (${Fmt.km(2 * station.oneWayKm)})", Fmt.eur(-calc.tripFuelCost), labelColor = muted)
-    if (calc.wearPerKm > 0.0) {
-        ValueRow(
-            "Verschleiß (${Fmt.km(2 * station.oneWayKm)} × ${Fmt.dec(calc.wearPerKm * 100.0, 1)} ct)",
-            Fmt.eur(-calc.tripWearCost),
-            labelColor = muted,
-        )
-    }
-    ValueRow(
-        "Unterm Strich",
-        Fmt.eurSigned(calc.netSaving),
-        bold = true,
-        color = if (calc.worthIt) r.good else r.bad,
-    )
 }
 
 @Composable
-private fun TomorrowLine(t: TomorrowHint, station: ForeignStation) {
-    val r = LocalResultColors.current
-    val (text, container, content) = when {
-        t.diff < -0.005 -> Triple(
-            "Morgen günstiger: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}) – wenn es nicht eilt, warten.",
-            r.goodContainer, r.onGoodContainer,
-        )
-        t.diff > 0.005 -> Triple(
-            "Morgen teurer: ${Fmt.local(t.price, station.country)} (${Fmt.localDiff(t.diff, station.country)}) – besser heute tanken.",
-            r.badContainer, r.onBadContainer,
-        )
-        else -> Triple(
-            "Morgen gilt derselbe Höchstpreis.",
-            MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurface,
-        )
-    }
-    Surface(shape = MaterialTheme.shapes.small, color = container, modifier = Modifier.padding(top = 6.dp)) {
-        Text(text, style = MaterialTheme.typography.bodySmall, color = content, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+private fun CompareRow(title: String, detail: String, average: Double, own: Double) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall.merge(Tabular))
+            Text(detail, style = MaterialTheme.typography.bodySmall.merge(Tabular), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DeltaTag(own, average, short = true)
     }
 }
 
 // ---------------------------------------------------------------- Sonstiges
 
 @Composable
-private fun Notice(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp),
-    )
+private fun SettingsRow(s: Settings, onOpenSettings: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onOpenSettings)
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 4.dp),
+    ) {
+        Text(
+            listOf(
+                s.fuel.label,
+                "${Fmt.dec(s.consumption, 1)} l/100 km",
+                "${Fmt.dec(s.liters, 0)} l",
+                if (s.wearCentPerKm > 0.0) "Verschleiß ${Fmt.dec(s.wearCentPerKm, 1)} ct/km" else "ohne Verschleiß",
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = "Einstellungen öffnen",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun Footer(onSources: () -> Unit) {
+    Column(Modifier.padding(horizontal = 4.dp)) {
+        Text(
+            "Daten: Tankerkönig (CC BY 4.0) · OpenStreetMap · ohne Gewähr",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onSources, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                Text("Quellen & Lizenzen")
+            }
+            Spacer(Modifier.weight(1f))
+            Text(copyrightLine(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable
 private fun ErrorCard(errors: List<String>) {
-    androidx.compose.material3.Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Nicht alles konnte geladen werden", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onErrorContainer)
-            errors.forEach {
-                Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
-            }
-        }
+    // Neutral statt rosa, damit sie nicht wie ein "Lohnt sich nicht"-Ergebnis aussieht.
+    AppCard(contentColor = MaterialTheme.colorScheme.onSurfaceVariant) {
+        Text("Nicht alles konnte geladen werden", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error)
+        errors.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -566,7 +653,14 @@ private fun SetupCard(onOpenSettings: () -> Unit) {
             "Trage deinen kostenlosen Tankerkönig-Schlüssel ein und wähle deine deutsche Tankstelle.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) { Text("Zu den Einstellungen") }
+        Button(
+            onClick = onOpenSettings,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+            ),
+            modifier = Modifier.padding(top = 4.dp),
+        ) { Text("Zu den Einstellungen") }
     }
 }
 
@@ -575,32 +669,9 @@ private fun HintCard() {
     AppCard {
         Text("Noch keine Tankstelle im Ausland", style = MaterialTheme.typography.titleSmall)
         Text(
-            "Tippe unten auf „Tankstelle“ und suche in OpenStreetMap nach einer Tankstelle in Tschechien " +
-                "oder Polen – die Strecke rechnet die App selbst aus.",
+            "Such unten eine Tankstelle in Tschechien oder Polen. Die Strecke rechnet die App selbst aus.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun SourcesFooter() {
-    val uri = LocalUriHandler.current
-    Column(Modifier.padding(start = 4.dp, top = 12.dp, end = 4.dp)) {
-        Text(
-            "Preise Deutschland: Tankerkönig, Daten der Markttransparenzstelle für Kraftstoffe (MTS-K), " +
-                "Lizenz CC BY 4.0. Höchstpreise: Finanzministerium Tschechien, Energieministerium Polen. " +
-                "Kurse: ČNB, NBP. Richtwerte ohne Höchstpreis: EU Weekly Oil Bulletin über fuel-prices.eu, " +
-                "CC BY 4.0. Tankstellensuche: © OpenStreetMap-Mitwirkende (ODbL) über Nominatim, " +
-                "Strecken: OSRM. Höchstpreise sind Obergrenzen, an der Säule kann es günstiger sein. " +
-                "Fahrtkosten: Sprit zum Auslandspreis plus dein Verschleißwert aus den Einstellungen, " +
-                "ohne Zeit. Alle Angaben ohne Gewähr.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row {
-            TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) { Text("tankerkoenig.de") }
-            TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) { Text("OpenStreetMap") }
-        }
     }
 }

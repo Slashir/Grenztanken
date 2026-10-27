@@ -8,10 +8,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -19,45 +27,61 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import de.grenztanken.app.model.Country
+import java.time.Year
 import java.util.Locale
 import kotlin.math.abs
 
-/** Karte im App-Stil: flach, große Rundung, heller Hintergrund. */
+/** Urheber, wie er in der App steht. */
+const val COPYRIGHT_HOLDER = "Slashir"
+
+fun copyrightLine(): String = "© ${Year.now().value} $COPYRIGHT_HOLDER"
+
+/** Karte im App-Stil: flach, große Rundung. */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    val inner: @Composable ColumnScope.() -> Unit = {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
-    }
-    if (onClick != null) {
-        Card(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = colors, content = inner)
-    } else {
-        Card(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = colors, content = inner)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
 }
 
-/** Hervorgehobene Karte mit Farbverlauf; Text darin nimmt automatisch die helle Inhaltsfarbe. */
+/** Die eine hervorgehobene Ergebnis-Fläche eines Bildschirms; Text darin nimmt die helle Inhaltsfarbe. */
 @Composable
 fun HeroCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val h = LocalHeroColors.current
@@ -65,46 +89,44 @@ fun HeroCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
         modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
-            .background(Brush.linearGradient(listOf(h.start, h.end))),
+            .background(h.container),
     ) {
         CompositionLocalProvider(LocalContentColor provides h.content) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
         }
     }
 }
 
-/** Zweitrangige Textfarbe passend zur Umgebung (Karte oder Hero-Karte). */
+/** Zweitrangige Textfarbe passend zur Umgebung (normale, farbige oder Hero-Karte). */
 @Composable
-fun mutedColor(): Color = LocalContentColor.current.copy(alpha = 0.72f)
+fun mutedColor(): Color = LocalContentColor.current.copy(alpha = 0.74f)
 
-/** Rundes Symbol mit getöntem Hintergrund, z. B. vor Abschnittsüberschriften. */
+/** Rundes Symbol mit neutralem Hintergrund vor Abschnittsüberschriften. */
 @Composable
 fun IconBadge(icon: ImageVector, modifier: Modifier = Modifier) {
     Box(
         modifier
             .size(36.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
     }
 }
 
-/** Runder Anfangsbuchstabe, z. B. für Automarken. */
+/** Länderkürzel als kleine Plakette ("CZ", "PL") statt Flaggen-Emojis, die je nach Gerät anders aussehen. */
 @Composable
-fun Monogram(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.secondaryContainer),
-        contentAlignment = Alignment.Center,
+fun CountryBadge(country: Country) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = LocalContentColor.current.copy(alpha = 0.1f),
+        contentColor = LocalContentColor.current,
     ) {
         Text(
-            text.take(1).uppercase(Locale.GERMANY),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            country.code,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
 }
@@ -121,7 +143,7 @@ fun GroupedRow(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val big = 22.dp
+    val big = 20.dp
     val small = 6.dp
     val shape = RoundedCornerShape(
         topStart = if (index == 0) big else small,
@@ -137,8 +159,49 @@ fun GroupedRow(
             .clip(shape)
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) { content() }
+        Box(
+            Modifier
+                .heightIn(min = 52.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) { content() }
     }
+}
+
+/** Textknopf "Rechnung anzeigen ▾" / "… ausblenden ▴" in der Farbe der Umgebung. */
+@Composable
+fun ExpandButton(
+    expanded: Boolean,
+    closedLabel: String,
+    openLabel: String,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = LocalContentColor.current,
+) {
+    TextButton(
+        onClick = onToggle,
+        modifier = modifier,
+        colors = ButtonDefaults.textButtonColors(contentColor = color),
+    ) {
+        Text(if (expanded) openLabel else closedLabel, style = MaterialTheme.typography.labelLarge)
+        Icon(
+            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/** Gestrichelter Rahmen, z. B. für "Hinzufügen"-Flächen. */
+fun Modifier.dashedBorder(color: Color, radius: Dp, width: Dp = 1.5.dp): Modifier = drawBehind {
+    val stroke = width.toPx()
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(stroke / 2, stroke / 2),
+        size = Size(size.width - stroke, size.height - stroke),
+        cornerRadius = CornerRadius(radius.toPx()),
+        style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))),
+    )
 }
 
 /** Zusätzliche Symbole im Stil der Material-Icons (Pfade aus Material Icons, Apache 2.0). */
@@ -158,6 +221,13 @@ object AppIcons {
                 "0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 " +
                 "2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM12 10H6V5h6v5zm6 " +
                 "0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z",
+        )
+    }
+
+    val OpenInNew: ImageVector by lazy {
+        icon(
+            "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 " +
+                "9.83 1.41 1.41L19 6.41V10h2V3h-7z",
         )
     }
 
@@ -186,9 +256,17 @@ fun Tag(text: String, container: Color, content: Color, modifier: Modifier = Mod
     }
 }
 
-/**
- * Euro-Preis wie an der Zapfsäule: "1,73⁹ €" – die dritte Nachkommastelle klein und hochgestellt.
- */
+/** "1,72⁹ €" für Fließtext: die dritte Nachkommastelle klein und hochgestellt, wie an der Zapfsäule. */
+fun pumpText(eurPerL: Double): AnnotatedString {
+    val s = String.format(Locale.GERMANY, "%.3f", eurPerL)
+    return buildAnnotatedString {
+        append(s.dropLast(1))
+        withStyle(SpanStyle(fontSize = 0.72.em, baselineShift = BaselineShift(0.4f))) { append(s.last()) }
+        append(" €")
+    }
+}
+
+/** Euro-Preis wie an der Zapfsäule als eigene Zeile. */
 @Composable
 fun PumpPrice(eurPerL: Double, style: TextStyle, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     val s = String.format(Locale.GERMANY, "%.3f", eurPerL)
@@ -206,13 +284,21 @@ fun PumpPrice(eurPerL: Double, style: TextStyle, modifier: Modifier = Modifier, 
 
 /** Vergleich eigener Preis gegen einen Durchschnitt: grün darunter, rot darüber. */
 @Composable
-fun DeltaTag(own: Double, reference: Double) {
+fun DeltaTag(own: Double, reference: Double, short: Boolean = false) {
     val r = LocalResultColors.current
     val ct = (own - reference) * 100.0
     when {
         abs(ct) < 0.05 -> Tag("= Ø", MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurface)
-        ct < 0 -> Tag(String.format(Locale.GERMANY, "%.1f ct unter Ø", -ct), r.goodContainer, r.onGoodContainer)
-        else -> Tag(String.format(Locale.GERMANY, "%.1f ct über Ø", ct), r.badContainer, r.onBadContainer)
+        ct < 0 -> Tag(
+            if (short) Fmt.ctDelta(ct) else String.format(Locale.GERMANY, "%.1f ct unter Ø", -ct),
+            r.goodContainer,
+            r.onGoodContainer,
+        )
+        else -> Tag(
+            if (short) Fmt.ctDelta(ct) else String.format(Locale.GERMANY, "%.1f ct über Ø", ct),
+            r.badContainer,
+            r.onBadContainer,
+        )
     }
 }
 
@@ -235,4 +321,43 @@ fun ValueRow(
             color = color,
         )
     }
+}
+
+/** Datenquellen, Lizenzen und Urheber an einer Stelle. */
+@Composable
+fun SourcesDialog(onDismiss: () -> Unit) {
+    val uri = LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Schließen") } },
+        title = { Text("Quellen & Lizenzen") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(
+                    "Preise Deutschland" to "Tankerkönig, Daten der Markttransparenzstelle für Kraftstoffe (MTS-K), CC BY 4.0",
+                    "Höchstpreise" to "Finanzministerium Tschechien, Energieministerium Polen",
+                    "Wechselkurse" to "Tschechische Nationalbank (ČNB), Polnische Nationalbank (NBP)",
+                    "Richtwerte ohne Höchstpreis" to "EU Weekly Oil Bulletin über fuel-prices.eu, CC BY 4.0",
+                    "Tankstellensuche" to "© OpenStreetMap-Mitwirkende (ODbL) über Nominatim; Strecken: OSRM",
+                    "Autokosten" to "ADAC Autokatalog",
+                    "Schrift" to "Inter, SIL Open Font License 1.1",
+                ).forEach { (title, text) ->
+                    Column {
+                        Text(title, style = MaterialTheme.typography.titleSmall)
+                        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Text(
+                    "Höchstpreise sind Obergrenzen, an der Säule kann es günstiger sein. Alle Angaben ohne Gewähr.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row {
+                    TextButton(onClick = { uri.openUri("https://creativecommons.tankerkoenig.de") }) { Text("Tankerkönig") }
+                    TextButton(onClick = { uri.openUri("https://www.openstreetmap.org/copyright") }) { Text("OpenStreetMap") }
+                }
+                Text(copyrightLine(), style = MaterialTheme.typography.labelLarge)
+            }
+        },
+    )
 }

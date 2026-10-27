@@ -2,7 +2,10 @@
 
 package de.grenztanken.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -16,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -27,7 +31,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -46,8 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -75,19 +80,18 @@ fun SettingsScreen(
     LaunchedEffect(settings.kmPerYear) {
         if (km.toIntOrNull() != settings.kmPerYear) km = settings.kmPerYear.toString()
     }
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showSources by remember { mutableStateOf(false) }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text("Einstellungen") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
-                scrollBehavior = scroll,
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -96,10 +100,10 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Section(Icons.Filled.Lock, "Tankerkönig-Schlüssel", "für die Preise in Deutschland") {
+            Section(Icons.Filled.Lock, "Tankerkönig-Schlüssel") {
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { value ->
@@ -110,12 +114,16 @@ fun SettingsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Muted(
-                    "Kostenlos und persönlich. Er bleibt nur auf deinem Gerät und wird ausschließlich " +
-                        "an Tankerkönig gesendet.",
-                )
-                TextButton(onClick = { uri.openUri("https://onboarding.tankerkoenig.de/") }) {
-                    Text("Schlüssel beantragen")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Kostenlos, bleibt auf deinem Gerät.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { uri.openUri("https://onboarding.tankerkoenig.de/") }) {
+                        Text("Schlüssel beantragen")
+                    }
                 }
             }
 
@@ -156,13 +164,17 @@ fun SettingsScreen(
                 }
             }
 
-            Section(Icons.Filled.Build, "Verschleiß & Wartung", "Kosten pro km außer Sprit") {
+            Section(
+                Icons.Filled.Build,
+                "Verschleiß & Wartung",
+                trailing = settings.wearCentPerKm.takeIf { it > 0.0 }?.let { "${Fmt.dec(it, 1)} ct/km" },
+            ) {
                 val adac = settings.adacCost
                 if (adac != null) {
                     Text(adac.car, style = MaterialTheme.typography.titleSmall)
                     Muted(
-                        "ADAC Autokatalog · ${years(adac.usedMonths)} Haltedauer · " +
-                            "Werkstatt und Reifen ${Fmt.eur(adac.workshopPerMonth(settings.kmPerYear))} im Monat",
+                        "ADAC · ${years(adac.usedMonths)} · Werkstatt & Reifen " +
+                            "${Fmt.eur(adac.workshopPerMonth(settings.kmPerYear))} im Monat",
                     )
                     NumberField(
                         value = km,
@@ -189,12 +201,12 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ValueRow(
-                        if (adac.hasMileageSteps) "Zusatzkosten pro km" else "Durchschnitt pro km",
-                        "${Fmt.dec(settings.wearCentPerKm, 1)} ct/km",
-                        bold = true,
-                        color = MaterialTheme.colorScheme.primary,
+                    Muted(
+                        if (adac.hasMileageSteps) {
+                            "Gerechnet wird, was jeder zusätzliche km kostet."
+                        } else {
+                            "Der ADAC nennt für diese Variante nur einen Wert; gerechnet wird mit dem Durchschnitt pro km."
+                        },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = onOpenAdac) { Text("Ändern") }
@@ -232,42 +244,72 @@ fun SettingsScreen(
                     Text(german.name, style = MaterialTheme.typography.titleSmall)
                     Muted(german.address)
                 }
-                Button(onClick = onPickStation) {
-                    Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("  Tankstelle suchen")
+                if (german == null) {
+                    // Ohne Tankstelle ist das die Hauptaktion des Bildschirms.
+                    Button(
+                        onClick = onPickStation,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("  Tankstelle suchen")
+                    }
+                } else {
+                    FilledTonalButton(onClick = onPickStation) { Text("Andere Tankstelle wählen") }
                 }
             }
 
-            Section(Icons.Filled.Info, "Datenquellen") {
-                Muted(
-                    "Deutschland: Tankerkönig (Daten der Markttransparenzstelle für Kraftstoffe, CC BY 4.0). " +
-                        "Tschechien: tägliche Höchstpreise des Finanzministeriums. " +
-                        "Polen: tägliche Höchstpreise des Energieministeriums. " +
-                        "Wechselkurse: Tschechische Nationalbank (ČNB) und Polnische Nationalbank (NBP). " +
-                        "Gibt es keinen gültigen Höchstpreis, rechnet die App mit dem wöchentlichen " +
-                        "EU-Landesdurchschnitt (EU Weekly Oil Bulletin über fuel-prices.eu, CC BY 4.0) – " +
-                        "oder mit deinem Preis von der Säule, wenn du einen einträgst. " +
-                        "Autokosten: ADAC Autokatalog. Schrift: Inter (SIL Open Font License).",
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { showSources = true }
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                IconBadge(Icons.Filled.Info)
+                Text(
+                    "Datenquellen & Lizenzen",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                )
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Text(
+                copyrightLine(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+            )
         }
     }
+    if (showSources) SourcesDialog(onDismiss = { showSources = false })
 }
 
 @Composable
 private fun Section(
     icon: ImageVector,
     title: String,
-    subtitle: String? = null,
+    trailing: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AppCard {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
             IconBadge(icon)
             Spacer(Modifier.size(12.dp))
-            Column {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                subtitle?.let { Muted(it) }
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            trailing?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium.merge(Tabular), color = MaterialTheme.colorScheme.primary)
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
