@@ -155,3 +155,11 @@ app/src/main/java/de/grenztanken/app/
                          gruppierte Listen, Quellen-Dialog; AdacScreen.kt: Auswahl im ADAC-Katalog)
 app/src/test/            Unit-Tests für Rechnung, Preisquelle, Parser, OSM-Suche und ADAC-Katalog
 ```
+
+## Lizenz
+
+Copyright © 2026 Slashir. Grenztanken ist freie Software unter der
+[GNU General Public License, Version 3](LICENSE). Du darfst die App nutzen, verändern und
+weitergeben. Veränderte Fassungen müssen ebenfalls unter der GPL-3.0 und mit Quellcode erscheinen.
+
+Die Schrift Inter steht unter der SIL Open Font License (`app/src/main/assets/licenses/Inter-OFL.txt`).
