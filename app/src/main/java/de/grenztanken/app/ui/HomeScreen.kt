@@ -353,7 +353,8 @@ private fun shortSource(p: ForeignPrice): String = when (p.source) {
 
 private fun sourceLabel(p: ForeignPrice): String = when (p.source) {
     PriceSource.MANUAL -> "Preis von dir eingetragen."
-    PriceSource.CAP_TODAY -> "Amtlicher Höchstpreis, gültig ${p.period?.let { Fmt.period(it) }.orEmpty()}."
+    // Fmt.period endet mit dem Punkt des Datums, der zugleich den Satz schließt.
+    PriceSource.CAP_TODAY -> p.period?.let { "Amtlicher Höchstpreis, gültig ${Fmt.period(it)}" } ?: "Amtlicher Höchstpreis."
     PriceSource.CAP_TOMORROW ->
         "Amtlicher Höchstpreis ab morgen (${p.period?.let { Fmt.period(it) }.orEmpty()}); " +
             "der heutige Wert wurde nicht abgerufen."
