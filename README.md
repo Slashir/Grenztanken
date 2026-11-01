@@ -13,6 +13,12 @@ Dir hilft die App? Über Ko-fi kannst du mir einen Kaffee ausgeben:
 > Den Schlüssel in der App unter *Einstellungen → Tankerkönig-Schlüssel* eintragen. Er bleibt auf dem
 > Gerät und wird nur an Tankerkönig gesendet. Schlüssel nicht weitergeben und nicht veröffentlichen.
 
+<p align="center">
+  <img src="docs/bilder/startseite.png" width="270" alt="Startseite: Tanken in Horní Poustevna (CZ) und Sieniawka (PL) lohnt sich nicht, weil die Fahrt mehr kostet als die Ersparnis">
+  &nbsp;
+  <img src="docs/bilder/einstellungen.png" width="270" alt="Einstellungen: Verbrauch, Tankmenge und Verschleiß nach ADAC für einen VW Passat, dazu die deutsche Tankstelle in Radeberg">
+</p>
+
 ## Installation
 
 1. Unter [Releases](https://github.com/Slashir/Grenztanken/releases) die neueste
